@@ -1,12 +1,79 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import React, { useState, useMemo } from 'react';
+import { products } from '@/data/products';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import ProductCard from '@/components/ProductCard';
+import CategoryFilter from '@/components/CategoryFilter';
+import ReviewSection from '@/components/ReviewSection';
 
-const Index = () => {
+const Index: React.FC = () => {
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [selectedCategory, searchQuery]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header onSearch={setSearchQuery} searchQuery={searchQuery} />
+      
+      <main className="container mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <section className="mb-12 text-center">
+          <div className="gradient-hero rounded-2xl p-8 md:p-12 text-primary-foreground">
+            <h1 className="font-serif text-3xl md:text-5xl font-bold mb-4 animate-fade-in">
+              Welcome to PUTHIYAM PRODUCTS
+            </h1>
+            <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto animate-fade-in">
+              Discover authentic, quality products delivered with love. From traditional spices to everyday essentials.
+            </p>
+          </div>
+        </section>
+
+        {/* Categories */}
+        <section className="mb-8">
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+        </section>
+
+        {/* Products Grid */}
+        <section className="mb-16">
+          <h2 className="font-serif text-2xl font-bold mb-6">
+            {selectedCategory === 'All' ? 'All Products' : selectedCategory}
+            <span className="text-muted-foreground text-base font-normal ml-2">
+              ({filteredProducts.length} items)
+            </span>
+          </h2>
+          
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              {filteredProducts.map(product => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No products found. Try a different search or category.</p>
+            </div>
+          )}
+        </section>
+
+        {/* Reviews Section */}
+        <section>
+          <h2 className="font-serif text-2xl font-bold mb-6">Customer Reviews</h2>
+          <ReviewSection />
+        </section>
+      </main>
+
+      <Footer />
     </div>
   );
 };
