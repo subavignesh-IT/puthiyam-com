@@ -7,11 +7,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
+import { Phone, CreditCard, Banknote } from 'lucide-react';
 import QRCodePayment from './QRCodePayment';
 
 const CheckoutForm: React.FC = () => {
   const { items, getTotal, getShippingCost, clearCart } = useCart();
   const [deliveryType, setDeliveryType] = useState<'shipping' | 'self-pickup'>('self-pickup');
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -31,10 +33,14 @@ const CheckoutForm: React.FC = () => {
     }));
   };
 
-  const formatOrderMessage = () => {
+  const formatOrderMessage = (isPaid: boolean) => {
     const itemsText = items.map(item => 
       `• ${item.name}: ₹${item.price} × ${item.quantity} = ₹${item.price * item.quantity}`
     ).join('\n');
+
+    const paymentStatus = isPaid 
+      ? '✅ Payment Status: PAID' 
+      : '⏳ Payment Status: NOT PAID (Cash on Delivery)';
 
     return `🛒 *New Order from PUTHIYAM PRODUCTS*
 
@@ -51,7 +57,7 @@ Subtotal: ₹${subtotal}
 ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ? ' (FREE!)' : ''}` : ''}
 *Grand Total: ₹${grandTotal}*
 
-✅ Payment Status: PAID`;
+${paymentStatus}`;
   };
 
   const sendWhatsAppMessage = (message: string) => {
@@ -64,8 +70,8 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
     setPaymentComplete(true);
     setShowQR(false);
 
-    // Send WhatsApp message
-    const message = formatOrderMessage();
+    // Send WhatsApp message (online payment = PAID)
+    const message = formatOrderMessage(true);
     sendWhatsAppMessage(message);
 
     // Show thank you toast
@@ -79,14 +85,32 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
     clearCart();
   };
 
-  const handleProceedToPayment = () => {
+  const handleCODOrder = () => {
+    setPaymentComplete(true);
+
+    // Send WhatsApp message (COD = NOT PAID)
+    const message = formatOrderMessage(false);
+    sendWhatsAppMessage(message);
+
+    // Show thank you toast
+    toast({
+      title: "🎉 Order Placed!",
+      description: "Your COD order has been placed. Pay when you receive the order.",
+      duration: 5000,
+    });
+
+    // Clear cart
+    clearCart();
+  };
+
+  const validateForm = (): boolean => {
     if (!formData.name.trim()) {
       toast({
         title: "Name Required",
         description: "Please enter your name",
         variant: "destructive"
       });
-      return;
+      return false;
     }
     if (!formData.phone.trim() || !/^\d{10}$/.test(formData.phone)) {
       toast({
@@ -94,7 +118,7 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
         description: "Please enter a valid 10-digit phone number",
         variant: "destructive"
       });
-      return;
+      return false;
     }
     if (deliveryType === 'shipping' && !formData.address.trim()) {
       toast({
@@ -102,9 +126,19 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
         description: "Please enter your delivery address for shipping",
         variant: "destructive"
       });
-      return;
+      return false;
     }
-    setShowQR(true);
+    return true;
+  };
+
+  const handleProceed = () => {
+    if (!validateForm()) return;
+
+    if (paymentMethod === 'cod') {
+      handleCODOrder();
+    } else {
+      setShowQR(true);
+    }
   };
 
   if (items.length === 0 && !paymentComplete) {
@@ -148,8 +182,17 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
 
   return (
     <Card className="animate-fade-in">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="font-serif">Checkout</CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open('tel:9361284773')}
+          className="flex items-center gap-2"
+        >
+          <Phone className="w-4 h-4" />
+          Contact Us
+        </Button>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Customer Details */}
@@ -223,6 +266,36 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
           </div>
         )}
 
+        {/* Payment Method */}
+        <div className="space-y-3">
+          <Label>Payment Method</Label>
+          <RadioGroup
+            value={paymentMethod}
+            onValueChange={(value) => setPaymentMethod(value as 'online' | 'cod')}
+          >
+            <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
+              <RadioGroupItem value="online" id="online" />
+              <Label htmlFor="online" className="flex-1 cursor-pointer">
+                <span className="font-medium flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Online Payment (UPI)
+                </span>
+                <span className="block text-sm text-muted-foreground">Pay now via UPI QR code</span>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
+              <RadioGroupItem value="cod" id="cod" />
+              <Label htmlFor="cod" className="flex-1 cursor-pointer">
+                <span className="font-medium flex items-center gap-2">
+                  <Banknote className="w-4 h-4" />
+                  Cash on Delivery
+                </span>
+                <span className="block text-sm text-muted-foreground">Pay when you receive the order</span>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
         {/* Order Summary */}
         <div className="bg-muted/50 rounded-lg p-4 space-y-2">
           <div className="flex justify-between text-sm">
@@ -249,10 +322,10 @@ ${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ?
         </div>
 
         <Button
-          onClick={handleProceedToPayment}
+          onClick={handleProceed}
           className="w-full gradient-hero text-primary-foreground text-lg py-6"
         >
-          Proceed to Payment
+          {paymentMethod === 'cod' ? 'Place Order (Pay on Delivery)' : 'Proceed to Payment'}
         </Button>
       </CardContent>
     </Card>
