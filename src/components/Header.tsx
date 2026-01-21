@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Search } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, User, LogOut, Package } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -13,6 +21,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { getItemCount } = useCart();
+  const { user, signOut } = useAuth();
   const location = useLocation();
   const itemCount = getItemCount();
 
@@ -23,6 +32,10 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm shadow-soft">
@@ -68,6 +81,38 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 {link.label}
               </Link>
             ))}
+            
+            {/* User Menu */}
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <User className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link to="/orders" className="flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      My Orders
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive">
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link to="/login">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Login
+                </Button>
+              </Link>
+            )}
+            
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="w-5 h-5" />
@@ -133,6 +178,34 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 {link.label}
               </Link>
             ))}
+            {user ? (
+              <>
+                <Link
+                  to="/orders"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block py-3 text-sm font-medium text-muted-foreground"
+                >
+                  My Orders
+                </Link>
+                <button
+                  onClick={() => {
+                    handleSignOut();
+                    setIsMenuOpen(false);
+                  }}
+                  className="block py-3 text-sm font-medium text-destructive"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setIsMenuOpen(false)}
+                className="block py-3 text-sm font-medium text-primary"
+              >
+                Login
+              </Link>
+            )}
           </nav>
         )}
       </div>

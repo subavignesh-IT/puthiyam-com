@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -9,11 +9,11 @@ interface QRCodePaymentProps {
   onBack: () => void;
 }
 
-const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete, onBack }) => {
+const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onBack }) => {
   const upiId = 'kathaiahkarthik@okhdfcbank';
   const upiUrl = `upi://pay?pa=${upiId}&pn=PUTHIYAM%20PRODUCTS&am=${total}&cu=INR`;
   
-  // Generate QR code using Google Charts API
+  // Generate QR code using QR Server API
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
 
   return (
@@ -52,20 +52,12 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
             <li>2. Scan the QR code above</li>
             <li>3. Enter the amount: ₹{total}</li>
             <li>4. Complete the payment</li>
-            <li>5. Click "I've Completed Payment" below</li>
+            <li>5. After payment, your order will be confirmed via WhatsApp</li>
           </ol>
         </div>
 
-        <Button
-          onClick={onPaymentComplete}
-          className="w-full gradient-hero text-primary-foreground text-lg py-6"
-        >
-          <CheckCircle className="w-5 h-5 mr-2" />
-          I've Completed Payment
-        </Button>
-
         <p className="text-xs text-center text-muted-foreground">
-          After clicking, your order will be confirmed via WhatsApp
+          After completing payment, your order will be confirmed via WhatsApp
         </p>
       </CardContent>
     </Card>

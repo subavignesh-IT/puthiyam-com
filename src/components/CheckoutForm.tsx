@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +14,7 @@ import QRCodePayment from './QRCodePayment';
 
 const CheckoutForm: React.FC = () => {
   const { items, getTotal, getShippingCost, clearCart } = useCart();
+  const { user } = useAuth();
   const [deliveryType, setDeliveryType] = useState<'shipping' | 'self-pickup'>('self-pickup');
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
   const [formData, setFormData] = useState({
@@ -66,9 +69,44 @@ ${paymentStatus}`;
     window.open(whatsappUrl, '_blank');
   };
 
-  const handlePaymentSuccess = () => {
+  const saveOrderToDatabase = async (isPaid: boolean) => {
+    if (!user) return;
+
+    try {
+      const orderData = {
+        user_id: user.id,
+        customer_name: formData.name,
+        customer_phone: formData.phone,
+        customer_address: deliveryType === 'shipping' ? formData.address : null,
+        delivery_type: deliveryType,
+        payment_method: paymentMethod,
+        payment_status: isPaid ? 'paid' : 'pending',
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        subtotal: subtotal,
+        shipping_cost: shippingCost,
+        total: grandTotal,
+      };
+
+      const { error } = await supabase.from('orders').insert(orderData);
+      if (error) {
+        console.error('Error saving order:', error);
+      }
+    } catch (error) {
+      console.error('Error saving order:', error);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
     setPaymentComplete(true);
     setShowQR(false);
+
+    // Save order to database
+    await saveOrderToDatabase(true);
 
     // Send WhatsApp message (online payment = PAID)
     const message = formatOrderMessage(true);
@@ -85,8 +123,11 @@ ${paymentStatus}`;
     clearCart();
   };
 
-  const handleCODOrder = () => {
+  const handleCODOrder = async () => {
     setPaymentComplete(true);
+
+    // Save order to database
+    await saveOrderToDatabase(false);
 
     // Send WhatsApp message (COD = NOT PAID)
     const message = formatOrderMessage(false);
