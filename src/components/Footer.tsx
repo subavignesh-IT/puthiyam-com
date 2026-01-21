@@ -55,37 +55,31 @@ const Footer: React.FC = () => {
           {/* Contact */}
           <div>
             <h4 className="font-serif font-semibold mb-4">Contact Us</h4>
-            <ul className="space-y-3">
-              <li>
-                <a
-                  href="tel:9361284773"
-                  className="flex items-center gap-2 text-sm text-background/70 hover:text-accent transition-colors"
-                >
-                  <Phone className="w-4 h-4" />
-                  9361284773
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:puthiyamproduct@gmail.com"
-                  className="flex items-center gap-2 text-sm text-background/70 hover:text-accent transition-colors"
-                >
-                  <Mail className="w-4 h-4" />
-                  puthiyamproduct@gmail.com
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://wa.me/919361284773"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-background/70 hover:text-accent transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp Us
-                </a>
-              </li>
-            </ul>
+            <div className="space-y-3">
+              <a
+                href="tel:9361284773"
+                className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 rounded-lg text-sm text-background transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                9361284773
+              </a>
+              <a
+                href="mailto:puthiyamproduct@gmail.com"
+                className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 rounded-lg text-sm text-background transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+                puthiyamproduct@gmail.com
+              </a>
+              <a
+                href="https://wa.me/919361284773"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 bg-secondary/20 hover:bg-secondary/30 rounded-lg text-sm text-background transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                WhatsApp Us
+              </a>
+            </div>
           </div>
         </div>
 
