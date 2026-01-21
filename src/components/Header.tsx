@@ -42,15 +42,21 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center">
-              <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">P</span>
-            </div>
-            <div className="hidden sm:block">
+          <div className="flex items-center gap-2">
+            {user ? (
+              <Link to="/" className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center">
+                <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">P</span>
+              </Link>
+            ) : (
+              <Link to="/login" className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center hover:opacity-90 transition-opacity">
+                <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">P</span>
+              </Link>
+            )}
+            <Link to="/" className="hidden sm:block">
               <h1 className="font-serif font-bold text-lg md:text-xl text-foreground">PUTHIYAM</h1>
               <p className="text-xs text-muted-foreground -mt-1">PRODUCTS</p>
-            </div>
-          </Link>
+            </Link>
+          </div>
 
           {/* Search Bar - Desktop */}
           {onSearch && (
@@ -104,14 +110,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : (
-              <Link to="/login">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <User className="w-4 h-4" />
-                  Login
-                </Button>
-              </Link>
-            )}
+            ) : null}
             
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon" className="relative">
@@ -197,15 +196,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   Logout
                 </button>
               </>
-            ) : (
-              <Link
-                to="/login"
-                onClick={() => setIsMenuOpen(false)}
-                className="block py-3 text-sm font-medium text-primary"
-              >
-                Login
-              </Link>
-            )}
+            ) : null}
           </nav>
         )}
       </div>
