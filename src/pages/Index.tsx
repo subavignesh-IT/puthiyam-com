@@ -5,6 +5,7 @@ import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 import CategoryFilter from '@/components/CategoryFilter';
 import ReviewSection from '@/components/ReviewSection';
+import FloatingCart from '@/components/FloatingCart';
 
 const Index: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -74,6 +75,7 @@ const Index: React.FC = () => {
       </main>
 
       <Footer />
+      <FloatingCart />
     </div>
   );
 };

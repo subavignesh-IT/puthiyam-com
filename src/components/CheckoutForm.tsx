@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Phone, CreditCard, Banknote } from 'lucide-react';
 import QRCodePayment from './QRCodePayment';
+import CheckoutBillImage from './CheckoutBillImage';
 
 const CheckoutForm: React.FC = () => {
   const { items, getTotal, getShippingCost, clearCart } = useCart();
@@ -24,6 +26,7 @@ const CheckoutForm: React.FC = () => {
   });
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const billRef = useRef<HTMLDivElement>(null);
 
   const subtotal = getTotal();
   const shippingCost = deliveryType === 'shipping' ? getShippingCost() : 0;
@@ -34,39 +37,6 @@ const CheckoutForm: React.FC = () => {
       ...prev,
       [e.target.name]: e.target.value
     }));
-  };
-
-  const formatOrderMessage = (isPaid: boolean) => {
-    const itemsText = items.map(item => 
-      `• ${item.name}: ₹${item.price} × ${item.quantity} = ₹${item.price * item.quantity}`
-    ).join('\n');
-
-    const paymentStatus = isPaid 
-      ? '✅ Payment Status: PAID' 
-      : '⏳ Payment Status: NOT PAID (Cash on Delivery)';
-
-    return `🛒 *New Order from PUTHIYAM PRODUCTS*
-
-👤 *Customer Details:*
-Name: ${formData.name}
-Phone: ${formData.phone}
-${deliveryType === 'shipping' ? `Address: ${formData.address}` : 'Delivery: Self Pickup'}
-
-📦 *Order Details:*
-${itemsText}
-
-💰 *Bill Summary:*
-Subtotal: ₹${subtotal}
-${deliveryType === 'shipping' ? `Shipping: ₹${shippingCost}${subtotal >= 200 ? ' (FREE!)' : ''}` : ''}
-*Grand Total: ₹${grandTotal}*
-
-${paymentStatus}`;
-  };
-
-  const sendWhatsAppMessage = (message: string) => {
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/919361284773?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
   };
 
   const saveOrderToDatabase = async (isPaid: boolean) => {
@@ -101,6 +71,33 @@ ${paymentStatus}`;
     }
   };
 
+  const generateAndShareBill = async (isPaid: boolean) => {
+    // Wait for state updates and render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    if (billRef.current) {
+      try {
+        const canvas = await html2canvas(billRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+        
+        // Download the image
+        const link = document.createElement('a');
+        link.download = `PUTHIYAM_Bill_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        // Open WhatsApp with a summary
+        const message = `🛒 *New Order from PUTHIYAM PRODUCTS*\n\n👤 Customer: ${formData.name}\n📞 Phone: ${formData.phone}\n💰 Total: ₹${grandTotal}\n${isPaid ? '✅ PAID' : '⏳ COD - PENDING'}\n\n📎 Bill image attached`;
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://wa.me/919361284773?text=${encodedMessage}`, '_blank');
+      } catch (error) {
+        console.error('Error generating bill image:', error);
+      }
+    }
+  };
+
   const handlePaymentSuccess = async () => {
     setPaymentComplete(true);
     setShowQR(false);
@@ -108,15 +105,20 @@ ${paymentStatus}`;
     // Save order to database
     await saveOrderToDatabase(true);
 
-    // Send WhatsApp message (online payment = PAID)
-    const message = formatOrderMessage(true);
-    sendWhatsAppMessage(message);
+    // Generate bill image and share
+    await generateAndShareBill(true);
 
-    // Show thank you toast
+    // Show thank you toast with SMS info
+    const smsContent = `Thank you for your order! Total: ₹${grandTotal}. Your order has been confirmed. - PUTHIYAM PRODUCTS`;
     toast({
       title: "🎉 Thank You!",
-      description: "Your order has been placed successfully. You'll receive a confirmation shortly.",
-      duration: 5000,
+      description: (
+        <div>
+          <p>Your order has been placed successfully.</p>
+          <p className="text-xs mt-2 text-muted-foreground">SMS: {smsContent}</p>
+        </div>
+      ),
+      duration: 8000,
     });
 
     // Clear cart
@@ -129,15 +131,20 @@ ${paymentStatus}`;
     // Save order to database
     await saveOrderToDatabase(false);
 
-    // Send WhatsApp message (COD = NOT PAID)
-    const message = formatOrderMessage(false);
-    sendWhatsAppMessage(message);
+    // Generate bill image and share
+    await generateAndShareBill(false);
 
-    // Show thank you toast
+    // Show thank you toast with SMS info
+    const smsContent = `Thank you for your order! Total: ₹${grandTotal} (COD). Pay when you receive. - PUTHIYAM PRODUCTS`;
     toast({
       title: "🎉 Order Placed!",
-      description: "Your COD order has been placed. Pay when you receive the order.",
-      duration: 5000,
+      description: (
+        <div>
+          <p>Your COD order has been placed. Pay when you receive the order.</p>
+          <p className="text-xs mt-2 text-muted-foreground">SMS: {smsContent}</p>
+        </div>
+      ),
+      duration: 8000,
     });
 
     // Clear cart
@@ -222,154 +229,173 @@ ${paymentStatus}`;
   }
 
   return (
-    <Card className="animate-fade-in">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="font-serif">Checkout</CardTitle>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.open('tel:9361284773')}
-          className="flex items-center gap-2"
-        >
-          <Phone className="w-4 h-4" />
-          Contact Us
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Customer Details */}
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="name">Name *</Label>
-            <Input
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              placeholder="Enter your full name"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="phone">Phone Number *</Label>
-            <Input
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              placeholder="10-digit phone number"
-              maxLength={10}
-              required
-            />
-          </div>
-        </div>
+    <>
+      {/* Hidden Bill Image for Generation */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+        <CheckoutBillImage
+          ref={billRef}
+          customerName={formData.name}
+          customerPhone={formData.phone}
+          customerAddress={deliveryType === 'shipping' ? formData.address : null}
+          deliveryType={deliveryType}
+          paymentMethod={paymentMethod}
+          paymentStatus={paymentMethod === 'online' ? 'paid' : 'pending'}
+          items={items}
+          subtotal={subtotal}
+          shippingCost={shippingCost}
+          total={grandTotal}
+        />
+      </div>
 
-        {/* Delivery Type */}
-        <div className="space-y-3">
-          <Label>Delivery Method</Label>
-          <RadioGroup
-            value={deliveryType}
-            onValueChange={(value) => setDeliveryType(value as 'shipping' | 'self-pickup')}
+      <Card className="animate-fade-in">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="font-serif">Checkout</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open('tel:9361284773')}
+            className="flex items-center gap-2"
           >
-            <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
-              <RadioGroupItem value="self-pickup" id="self-pickup" />
-              <Label htmlFor="self-pickup" className="flex-1 cursor-pointer">
-                <span className="font-medium">Self Pickup</span>
-                <span className="block text-sm text-muted-foreground">Pick up from our store</span>
-              </Label>
-              <span className="text-secondary font-medium">FREE</span>
+            <Phone className="w-4 h-4" />
+            Contact Us
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Customer Details */}
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="Enter your full name"
+                required
+              />
             </div>
-            <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
-              <RadioGroupItem value="shipping" id="shipping" />
-              <Label htmlFor="shipping" className="flex-1 cursor-pointer">
-                <span className="font-medium">Home Delivery</span>
-                <span className="block text-sm text-muted-foreground">Delivered to your address</span>
-              </Label>
-              <span className={subtotal >= 200 ? 'text-secondary font-medium' : 'text-muted-foreground'}>
-                {subtotal >= 200 ? 'FREE' : '₹100'}
-              </span>
+            <div>
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+                placeholder="10-digit phone number"
+                maxLength={10}
+                required
+              />
             </div>
-          </RadioGroup>
-        </div>
-
-        {/* Address (only for shipping) */}
-        {deliveryType === 'shipping' && (
-          <div className="animate-fade-in">
-            <Label htmlFor="address">Delivery Address *</Label>
-            <Textarea
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              placeholder="Enter your complete delivery address"
-              rows={3}
-              required
-            />
           </div>
-        )}
 
-        {/* Payment Method */}
-        <div className="space-y-3">
-          <Label>Payment Method</Label>
-          <RadioGroup
-            value={paymentMethod}
-            onValueChange={(value) => setPaymentMethod(value as 'online' | 'cod')}
-          >
-            <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
-              <RadioGroupItem value="online" id="online" />
-              <Label htmlFor="online" className="flex-1 cursor-pointer">
-                <span className="font-medium flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  Online Payment (UPI)
+          {/* Delivery Type */}
+          <div className="space-y-3">
+            <Label>Delivery Method</Label>
+            <RadioGroup
+              value={deliveryType}
+              onValueChange={(value) => setDeliveryType(value as 'shipping' | 'self-pickup')}
+            >
+              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
+                <RadioGroupItem value="self-pickup" id="self-pickup" />
+                <Label htmlFor="self-pickup" className="flex-1 cursor-pointer">
+                  <span className="font-medium">Self Pickup</span>
+                  <span className="block text-sm text-muted-foreground">Pick up from our store</span>
+                </Label>
+                <span className="text-secondary font-medium">FREE</span>
+              </div>
+              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
+                <RadioGroupItem value="shipping" id="shipping" />
+                <Label htmlFor="shipping" className="flex-1 cursor-pointer">
+                  <span className="font-medium">Home Delivery</span>
+                  <span className="block text-sm text-muted-foreground">Delivered to your address</span>
+                </Label>
+                <span className={subtotal >= 200 ? 'text-secondary font-medium' : 'text-muted-foreground'}>
+                  {subtotal >= 200 ? 'FREE' : '₹100'}
                 </span>
-                <span className="block text-sm text-muted-foreground">Pay now via UPI QR code</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
-              <RadioGroupItem value="cod" id="cod" />
-              <Label htmlFor="cod" className="flex-1 cursor-pointer">
-                <span className="font-medium flex items-center gap-2">
-                  <Banknote className="w-4 h-4" />
-                  Cash on Delivery
-                </span>
-                <span className="block text-sm text-muted-foreground">Pay when you receive the order</span>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        {/* Order Summary */}
-        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>₹{subtotal}</span>
+              </div>
+            </RadioGroup>
           </div>
+
+          {/* Address (only for shipping) */}
           {deliveryType === 'shipping' && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Shipping</span>
-              <span className={shippingCost === 0 ? 'text-secondary' : ''}>
-                {shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}
-              </span>
+            <div className="animate-fade-in">
+              <Label htmlFor="address">Delivery Address *</Label>
+              <Textarea
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                placeholder="Enter your complete delivery address"
+                rows={3}
+                required
+              />
             </div>
           )}
-          <div className="border-t border-border pt-2 flex justify-between font-semibold">
-            <span>Grand Total</span>
-            <span className="text-primary">₹{grandTotal}</span>
-          </div>
-          {subtotal < 200 && deliveryType === 'shipping' && (
-            <p className="text-xs text-muted-foreground">
-              Add ₹{200 - subtotal} more for free shipping!
-            </p>
-          )}
-        </div>
 
-        <Button
-          onClick={handleProceed}
-          className="w-full gradient-hero text-primary-foreground text-lg py-6"
-        >
-          {paymentMethod === 'cod' ? 'Place Order (Pay on Delivery)' : 'Proceed to Payment'}
-        </Button>
-      </CardContent>
-    </Card>
+          {/* Payment Method */}
+          <div className="space-y-3">
+            <Label>Payment Method</Label>
+            <RadioGroup
+              value={paymentMethod}
+              onValueChange={(value) => setPaymentMethod(value as 'online' | 'cod')}
+            >
+              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
+                <RadioGroupItem value="online" id="online" />
+                <Label htmlFor="online" className="flex-1 cursor-pointer">
+                  <span className="font-medium flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Online Payment (UPI)
+                  </span>
+                  <span className="block text-sm text-muted-foreground">Pay now via UPI QR code</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">
+                <RadioGroupItem value="cod" id="cod" />
+                <Label htmlFor="cod" className="flex-1 cursor-pointer">
+                  <span className="font-medium flex items-center gap-2">
+                    <Banknote className="w-4 h-4" />
+                    Cash on Delivery
+                  </span>
+                  <span className="block text-sm text-muted-foreground">Pay when you receive the order</span>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Order Summary */}
+          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>₹{subtotal}</span>
+            </div>
+            {deliveryType === 'shipping' && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className={shippingCost === 0 ? 'text-secondary' : ''}>
+                  {shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}
+                </span>
+              </div>
+            )}
+            <div className="border-t border-border pt-2 flex justify-between font-semibold">
+              <span>Grand Total</span>
+              <span className="text-primary">₹{grandTotal}</span>
+            </div>
+            {subtotal < 200 && deliveryType === 'shipping' && (
+              <p className="text-xs text-muted-foreground">
+                Add ₹{200 - subtotal} more for free shipping!
+              </p>
+            )}
+          </div>
+
+          <Button
+            onClick={handleProceed}
+            className="w-full gradient-hero text-primary-foreground text-lg py-6"
+          >
+            {paymentMethod === 'cod' ? 'Place Order (Pay on Delivery)' : 'Proceed to Payment'}
+          </Button>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 

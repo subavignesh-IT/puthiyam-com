@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Search, User, LogOut, Package } from 'lucide-react';
-import { useCart } from '@/context/CartContext';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Search, Package, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +19,9 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { getItemCount } = useCart();
   const { user, signOut } = useAuth();
   const location = useLocation();
-  const itemCount = getItemCount();
+  const navigate = useNavigate();
 
   const navLinks = [
     { path: '/', label: 'Home' },
@@ -35,21 +33,54 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
 
   const handleSignOut = async () => {
     await signOut();
+    navigate('/');
   };
+
+  const getUserInitial = () => {
+    if (user?.email) {
+      return user.email.charAt(0).toUpperCase();
+    }
+    return 'P';
+  };
+
+  const LogoButton = () => (
+    <div className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+      <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">
+        {user ? getUserInitial() : 'P'}
+      </span>
+    </div>
+  );
 
   return (
     <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm shadow-soft">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          {/* Logo */}
+          {/* Logo with Login/Logout */}
           <div className="flex items-center gap-2">
             {user ? (
-              <Link to="/" className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center">
-                <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">P</span>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div>
+                    <LogoButton />
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link to="/orders" className="flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      My Orders
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive">
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
-              <Link to="/login" className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center hover:opacity-90 transition-opacity">
-                <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">P</span>
+              <Link to="/login">
+                <LogoButton />
               </Link>
             )}
             <Link to="/" className="hidden sm:block">
@@ -87,55 +118,10 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 {link.label}
               </Link>
             ))}
-            
-            {/* User Menu */}
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
-                    <User className="w-5 h-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link to="/orders" className="flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      My Orders
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive">
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-            
-            <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon" className="relative">
-                <ShoppingCart className="w-5 h-5" />
-                {itemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center animate-pop-in">
-                    {itemCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
           </nav>
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center gap-2">
-            <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon">
-                <ShoppingCart className="w-5 h-5" />
-                {itemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
-                    {itemCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -177,7 +163,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 {link.label}
               </Link>
             ))}
-            {user ? (
+            {user && (
               <>
                 <Link
                   to="/orders"
@@ -196,7 +182,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   Logout
                 </button>
               </>
-            ) : null}
+            )}
           </nav>
         )}
       </div>

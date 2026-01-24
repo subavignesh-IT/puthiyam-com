@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import CartItem from '@/components/CartItem';
 import CheckoutForm from '@/components/CheckoutForm';
+import FloatingCart from '@/components/FloatingCart';
 import { Button } from '@/components/ui/button';
 
 const Cart: React.FC = () => {
@@ -76,6 +77,7 @@ const Cart: React.FC = () => {
       </main>
 
       <Footer />
+      <FloatingCart />
     </div>
   );
 };
