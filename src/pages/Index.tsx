@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 import CategoryFilter from '@/components/CategoryFilter';
-import ReviewSection from '@/components/ReviewSection';
+
 import FloatingCart from '@/components/FloatingCart';
 
 const Index: React.FC = () => {
@@ -67,11 +67,6 @@ const Index: React.FC = () => {
           )}
         </section>
 
-        {/* Reviews Section */}
-        <section>
-          <h2 className="font-serif text-2xl font-bold mb-6">Customer Reviews</h2>
-          <ReviewSection />
-        </section>
       </main>
 
       <Footer />

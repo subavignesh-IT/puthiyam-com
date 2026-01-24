@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Star, Send } from 'lucide-react';
+import { ArrowLeft, Plus, Send } from 'lucide-react';
 import { products } from '@/data/products';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,7 +29,7 @@ const ProductDetail: React.FC = () => {
   const { user } = useAuth();
   const { addToCart } = useCart();
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+  const [newReview, setNewReview] = useState({ comment: '' });
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
 
@@ -86,7 +86,7 @@ const ProductDetail: React.FC = () => {
       product_id: id,
       user_id: user.id,
       user_name: user.email?.split('@')[0] || 'Customer',
-      rating: newReview.rating,
+      rating: 5,
       comment: newReview.comment,
     });
 
@@ -106,23 +106,10 @@ const ProductDetail: React.FC = () => {
       description: "Thank you for your feedback",
     });
 
-    setNewReview({ rating: 5, comment: '' });
+    setNewReview({ comment: '' });
     fetchReviews();
   };
 
-  const renderStars = (rating: number, interactive = false, onRate?: (r: number) => void) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`w-5 h-5 ${
-          i < rating
-            ? 'fill-accent text-accent'
-            : 'text-muted'
-        } ${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
-        onClick={() => interactive && onRate && onRate(i + 1)}
-      />
-    ));
-  };
 
   if (!product) {
     return (
@@ -195,11 +182,8 @@ const ProductDetail: React.FC = () => {
               {product.description}
             </p>
 
-            <div className="flex items-center gap-2">
-              {renderStars(Math.floor(product.rating))}
-              <span className="text-muted-foreground">
-                ({reviews.length} reviews)
-              </span>
+            <div className="text-muted-foreground">
+              {reviews.length} customer {reviews.length === 1 ? 'review' : 'reviews'}
             </div>
 
             <div className="text-3xl font-bold text-primary">
@@ -225,12 +209,6 @@ const ProductDetail: React.FC = () => {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-lg">Write a Review</h3>
               
-              <div className="space-y-2">
-                <Label>Your Rating</Label>
-                <div className="flex gap-1">
-                  {renderStars(newReview.rating, true, (r) => setNewReview(prev => ({ ...prev, rating: r })))}
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <Label>Your Review</Label>
@@ -264,18 +242,13 @@ const ProductDetail: React.FC = () => {
                 <Card key={review.id}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-semibold">{review.user_name}</p>
-                        <div className="flex gap-1 mt-1">
-                          {renderStars(review.rating)}
-                        </div>
-                      </div>
+                      <p className="font-semibold">{review.user_name}</p>
                       <span className="text-xs text-muted-foreground">
                         {new Date(review.created_at).toLocaleDateString()}
                       </span>
                     </div>
                     {review.comment && (
-                      <p className="text-muted-foreground mt-2">{review.comment}</p>
+                      <p className="text-muted-foreground">{review.comment}</p>
                     )}
                   </CardContent>
                 </Card>
