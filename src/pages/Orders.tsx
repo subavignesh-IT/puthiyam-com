@@ -5,6 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import BottomNav from '@/components/BottomNav';
 import BillImage from '@/components/BillImage';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

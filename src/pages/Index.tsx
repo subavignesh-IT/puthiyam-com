@@ -4,8 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 import CategoryFilter from '@/components/CategoryFilter';
-
-import FloatingCart from '@/components/FloatingCart';
+import BottomNav from '@/components/BottomNav';
 
 const Index: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -21,37 +20,29 @@ const Index: React.FC = () => {
   }, [selectedCategory, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Header onSearch={setSearchQuery} searchQuery={searchQuery} />
       
       <main className="container mx-auto px-4 py-8">
-        {/* Hero Section */}
         <section className="mb-12 text-center">
           <div className="gradient-hero rounded-2xl p-8 md:p-12 text-primary-foreground">
             <h1 className="font-serif text-3xl md:text-5xl font-bold mb-4 animate-fade-in">
               Welcome to PUTHIYAM PRODUCTS
             </h1>
             <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto animate-fade-in">
-              Discover authentic, quality products delivered with love. From traditional spices to everyday essentials.
+              Discover authentic, quality products delivered with love.
             </p>
           </div>
         </section>
 
-        {/* Categories */}
         <section className="mb-8">
-          <CategoryFilter
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
-          />
+          <CategoryFilter selectedCategory={selectedCategory} onCategoryChange={setSelectedCategory} />
         </section>
 
-        {/* Products Grid */}
         <section className="mb-16">
           <h2 className="font-serif text-2xl font-bold mb-6">
             {selectedCategory === 'All' ? 'All Products' : selectedCategory}
-            <span className="text-muted-foreground text-base font-normal ml-2">
-              ({filteredProducts.length} items)
-            </span>
+            <span className="text-muted-foreground text-base font-normal ml-2">({filteredProducts.length} items)</span>
           </h2>
           
           {filteredProducts.length > 0 ? (
@@ -66,11 +57,10 @@ const Index: React.FC = () => {
             </div>
           )}
         </section>
-
       </main>
 
       <Footer />
-      <FloatingCart />
+      <BottomNav />
     </div>
   );
 };

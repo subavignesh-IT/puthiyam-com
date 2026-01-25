@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Phone, Mail, MessageCircle, Clock, MapPin, Send } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import BottomNav from '@/components/BottomNav';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,7 +80,7 @@ const Contact: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Header />
       
       <main className="container mx-auto px-4 py-8">
@@ -193,6 +194,7 @@ const Contact: React.FC = () => {
       </main>
 
       <Footer />
+      <BottomNav />
     </div>
   );
 };

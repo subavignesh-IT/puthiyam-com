@@ -1,3 +1,8 @@
+export interface ProductVariant {
+  weight: string;
+  price: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -7,10 +12,12 @@ export interface Product {
   description: string;
   rating: number;
   reviewCount: number;
+  variants?: ProductVariant[];
 }
 
 export interface CartItem extends Product {
   quantity: number;
+  selectedVariant?: ProductVariant;
 }
 
 export interface Review {

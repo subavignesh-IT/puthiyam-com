@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, Package, LogOut } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
+import { Search, User, LogOut, ClipboardList, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 interface HeaderProps {
@@ -18,18 +18,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
-  const navLinks = [
-    { path: '/', label: 'Home' },
-    { path: '/about', label: 'About' },
-    { path: '/contact', label: 'Contact' },
-  ];
-
-  const isActive = (path: string) => location.pathname === path;
+  const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -40,54 +31,42 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     if (user?.email) {
       return user.email.charAt(0).toUpperCase();
     }
-    return 'P';
+    return 'U';
+  };
+
+  const getUserName = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name;
+    }
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    return 'User';
+  };
+
+  const getUserEmail = () => {
+    return user?.email || '';
   };
 
   const LogoButton = () => (
-    <div className="w-10 h-10 md:w-12 md:h-12 gradient-hero rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
-      <span className="text-primary-foreground font-serif font-bold text-lg md:text-xl">
-        {user ? getUserInitial() : 'P'}
+    <div className="flex items-center gap-2">
+      <div className="w-10 h-10 gradient-hero rounded-full flex items-center justify-center shadow-soft hover:shadow-elevated transition-all duration-300 hover:scale-105">
+        <span className="text-primary-foreground font-serif font-bold text-xl">P</span>
+      </div>
+      <span className="font-serif font-bold text-lg text-foreground hidden sm:block">
+        PUTHIYAM
       </span>
     </div>
   );
 
   return (
-    <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm shadow-soft">
+    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16 md:h-20">
-          {/* Logo with Login/Logout */}
-          <div className="flex items-center gap-2">
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div>
-                    <LogoButton />
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link to="/orders" className="flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      My Orders
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive">
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Link to="/login">
-                <LogoButton />
-              </Link>
-            )}
-            <Link to="/" className="hidden sm:block">
-              <h1 className="font-serif font-bold text-lg md:text-xl text-foreground">PUTHIYAM</h1>
-              <p className="text-xs text-muted-foreground -mt-1">PRODUCTS</p>
-            </Link>
-          </div>
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Link to="/" className="flex items-center">
+            <LogoButton />
+          </Link>
 
           {/* Search Bar - Desktop */}
           {onSearch && (
@@ -97,42 +76,71 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 <Input
                   type="text"
                   placeholder="Search products..."
+                  className="pl-10 bg-muted/50 border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                   value={searchQuery}
                   onChange={(e) => onSearch(e.target.value)}
-                  className="pl-10 bg-muted/50 border-0 focus-visible:ring-primary"
                 />
               </div>
             </div>
           )}
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map(link => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive(link.path) ? 'text-primary' : 'text-muted-foreground'
-                }`}
+          {/* User Section */}
+          <div className="flex items-center gap-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="flex items-center gap-2 px-2 hover:bg-muted/50 transition-all duration-200 hover:scale-105 active:scale-95"
+                  >
+                    <div className="w-9 h-9 gradient-hero rounded-full flex items-center justify-center shadow-soft">
+                      <span className="text-primary-foreground font-bold text-sm">
+                        {getUserInitial()}
+                      </span>
+                    </div>
+                    <div className="hidden sm:block text-left">
+                      <p className="text-sm font-medium leading-none">{getUserName()}</p>
+                      <p className="text-xs text-muted-foreground leading-none mt-0.5">{getUserEmail()}</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground hidden sm:block" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-popover shadow-elevated animate-fade-in">
+                  <div className="px-3 py-2 sm:hidden">
+                    <p className="text-sm font-medium">{getUserName()}</p>
+                    <p className="text-xs text-muted-foreground">{getUserEmail()}</p>
+                  </div>
+                  <DropdownMenuSeparator className="sm:hidden" />
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/orders')}
+                    className="cursor-pointer hover:bg-muted transition-colors"
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    My Orders
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={handleSignOut}
+                    className="cursor-pointer text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                onClick={() => navigate('/login')}
+                className="gradient-hero text-primary-foreground hover:scale-105 active:scale-95 transition-transform duration-200 shadow-soft"
               >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
+                <User className="w-4 h-4 mr-2" />
+                Login
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Mobile Search */}
+        {/* Search Bar - Mobile */}
         {onSearch && (
           <div className="md:hidden pb-3">
             <div className="relative">
@@ -140,50 +148,12 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
               <Input
                 type="text"
                 placeholder="Search products..."
+                className="pl-10 bg-muted/50 border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                 value={searchQuery}
                 onChange={(e) => onSearch(e.target.value)}
-                className="pl-10 bg-muted/50 border-0"
               />
             </div>
           </div>
-        )}
-
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <nav className="md:hidden py-4 border-t border-border animate-fade-in">
-            {navLinks.map(link => (
-              <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setIsMenuOpen(false)}
-                className={`block py-3 text-sm font-medium transition-colors ${
-                  isActive(link.path) ? 'text-primary' : 'text-muted-foreground'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-            {user && (
-              <>
-                <Link
-                  to="/orders"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="block py-3 text-sm font-medium text-muted-foreground"
-                >
-                  My Orders
-                </Link>
-                <button
-                  onClick={() => {
-                    handleSignOut();
-                    setIsMenuOpen(false);
-                  }}
-                  className="block py-3 text-sm font-medium text-destructive"
-                >
-                  Logout
-                </button>
-              </>
-            )}
-          </nav>
         )}
       </div>
     </header>
