@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, User, LogOut, ClipboardList, ChevronDown } from 'lucide-react';
+import { Search, User, LogOut, ClipboardList, ChevronDown, Store } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,31 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .rpc('has_role', { _user_id: user.id, _role: 'admin' });
+
+        if (!error && data === true) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminRole();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -118,6 +144,15 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                     <ClipboardList className="w-4 h-4 mr-2" />
                     My Orders
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem 
+                      onClick={() => navigate('/seller')}
+                      className="cursor-pointer hover:bg-muted transition-colors"
+                    >
+                      <Store className="w-4 h-4 mr-2" />
+                      Seller Dashboard
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={handleSignOut}

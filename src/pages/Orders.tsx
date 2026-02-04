@@ -40,6 +40,7 @@ interface Order {
   delivery_type: string;
   payment_method: string;
   payment_status: string;
+  order_status: string;
   items: OrderItem[];
   subtotal: number;
   shipping_cost: number;
@@ -80,7 +81,8 @@ const Orders: React.FC = () => {
       // Parse items from JSONB
       const parsedOrders = (data || []).map(order => ({
         ...order,
-        items: order.items as unknown as OrderItem[]
+        items: order.items as unknown as OrderItem[],
+        order_status: order.order_status || 'pending'
       }));
       
       setOrders(parsedOrders);
@@ -88,6 +90,30 @@ const Orders: React.FC = () => {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-500';
+      case 'processing': return 'bg-blue-500';
+      case 'waiting': return 'bg-orange-500';
+      case 'shipping': return 'bg-purple-500';
+      case 'delivered': return 'bg-green-500';
+      case 'cancelled': return 'bg-red-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getOrderStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return '⏳ Pending';
+      case 'processing': return '🔄 Processing';
+      case 'waiting': return '⌛ Waiting';
+      case 'shipping': return '🚚 Shipping';
+      case 'delivered': return '✅ Delivered';
+      case 'cancelled': return '❌ Cancelled';
+      default: return status;
     }
   };
 
@@ -268,9 +294,12 @@ const Orders: React.FC = () => {
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">{formatDate(order.created_at)}</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
                         {order.payment_status === 'paid' ? '✅ Paid' : '⏳ Pending'}
+                      </Badge>
+                      <Badge className={`${getOrderStatusColor(order.order_status)} text-white`}>
+                        {getOrderStatusLabel(order.order_status)}
                       </Badge>
                       <Badge variant="outline">
                         {order.delivery_type === 'shipping' ? 'Delivery' : 'Self Pickup'}

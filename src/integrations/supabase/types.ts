@@ -23,6 +23,7 @@ export type Database = {
           delivery_type: string
           id: string
           items: Json
+          order_status: string
           payment_method: string
           payment_status: string
           shipping_cost: number
@@ -38,6 +39,7 @@ export type Database = {
           delivery_type: string
           id?: string
           items: Json
+          order_status?: string
           payment_method: string
           payment_status: string
           shipping_cost?: number
@@ -53,12 +55,125 @@ export type Database = {
           delivery_type?: string
           id?: string
           items?: Json
+          order_status?: string
           payment_method?: string
           payment_status?: string
           shipping_cost?: number
           subtotal?: number
           total?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      product_images: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          id: string
+          image_url: string
+          is_primary: boolean | null
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          image_url: string
+          is_primary?: boolean | null
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          image_url?: string
+          is_primary?: boolean | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variants: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          price: number
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          price: number
+          product_id: string
+          quantity: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          price?: number
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          base_price: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          measurement_unit: string
+          name: string
+          packing_type: string | null
+          seller_id: string
+          updated_at: string
+        }
+        Insert: {
+          base_price: number
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          measurement_unit?: string
+          name: string
+          packing_type?: string | null
+          seller_id: string
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          measurement_unit?: string
+          name?: string
+          packing_type?: string | null
+          seller_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
