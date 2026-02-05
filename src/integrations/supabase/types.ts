@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           created_at: string
@@ -65,6 +83,24 @@ export type Database = {
         }
         Relationships: []
       }
+      packing_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       product_images: {
         Row: {
           created_at: string
@@ -108,6 +144,7 @@ export type Database = {
           price: number
           product_id: string
           quantity: number
+          stock_quantity: number
         }
         Insert: {
           created_at?: string
@@ -116,6 +153,7 @@ export type Database = {
           price: number
           product_id: string
           quantity: number
+          stock_quantity?: number
         }
         Update: {
           created_at?: string
@@ -124,6 +162,7 @@ export type Database = {
           price?: number
           product_id?: string
           quantity?: number
+          stock_quantity?: number
         }
         Relationships: [
           {
@@ -141,8 +180,11 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          discount_amount: number
           id: string
           is_active: boolean
+          is_in_stock: boolean
+          is_on_sale: boolean
           measurement_unit: string
           name: string
           packing_type: string | null
@@ -154,8 +196,11 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          discount_amount?: number
           id?: string
           is_active?: boolean
+          is_in_stock?: boolean
+          is_on_sale?: boolean
           measurement_unit?: string
           name: string
           packing_type?: string | null
@@ -167,8 +212,11 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          discount_amount?: number
           id?: string
           is_active?: boolean
+          is_in_stock?: boolean
+          is_on_sale?: boolean
           measurement_unit?: string
           name?: string
           packing_type?: string | null

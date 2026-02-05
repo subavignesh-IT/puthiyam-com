@@ -433,6 +433,7 @@ const Orders: React.FC = () => {
       )}
 
       <Footer />
+      <BottomNav />
     </div>
   );
 };

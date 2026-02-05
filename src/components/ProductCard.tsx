@@ -2,6 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '@/types/product';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Percent } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -19,6 +21,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     ? product.variants[0].price
     : product.price;
 
+  // Calculate discounted price if on sale
+  const finalPrice = product.isOnSale && product.discountAmount
+    ? Math.max(0, displayPrice - product.discountAmount)
+    : displayPrice;
+
   return (
     <Card 
       className="group overflow-hidden border-0 shadow-soft hover:shadow-elevated transition-all duration-300 animate-fade-in cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
@@ -30,6 +37,19 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
+            <Badge className="bg-red-500 text-white text-xs shadow-lg">
+              <Percent className="w-3 h-3 mr-1" />
+              ₹{product.discountAmount} OFF
+            </Badge>
+          )}
+          {product.isInStock === false && (
+            <Badge variant="destructive" className="text-xs">
+              Out of Stock
+            </Badge>
+          )}
+        </div>
         <div className="absolute top-2 right-2">
           <span className="bg-secondary text-secondary-foreground text-xs px-2 py-1 rounded-full shadow-sm">
             {product.category}
@@ -47,7 +67,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </p>
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-lg font-bold text-primary">₹{displayPrice}</span>
+            {product.isOnSale && product.discountAmount && product.discountAmount > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-primary">₹{finalPrice}</span>
+                <span className="text-sm text-muted-foreground line-through">₹{displayPrice}</span>
+              </div>
+            ) : (
+              <span className="text-lg font-bold text-primary">₹{displayPrice}</span>
+            )}
             {product.variants && product.variants.length > 0 && (
               <span className="text-xs text-muted-foreground ml-1">
                 ({product.variants[0].weight})

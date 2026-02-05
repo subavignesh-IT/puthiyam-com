@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -29,13 +30,26 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Package, Plus, Trash2, Upload, ShoppingCart, Edit } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings } from 'lucide-react';
+import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
 
 interface OrderItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
+  selectedVariant?: { weight: string; price: number };
 }
 
 interface Order {
@@ -56,9 +70,16 @@ interface Order {
 }
 
 interface ProductVariant {
+  id?: string;
   quantity: number;
   price: number;
   isDefault: boolean;
+  stockQuantity: number;
+}
+
+interface ProductWithDetails extends DbProduct {
+  variants: DbProductVariant[];
+  images: DbProductImage[];
 }
 
 const ORDER_STATUSES = [
@@ -70,17 +91,6 @@ const ORDER_STATUSES = [
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-500' },
 ];
 
-const CATEGORIES = [
-  'Hair Care',
-  'Skin Care',
-  'Face Care',
-  'Body Care',
-  'Health',
-  'Wellness',
-  'Essential Oils',
-  'Herbal Products',
-];
-
 const MEASUREMENT_UNITS = [
   { value: 'g', label: 'Grams (g)' },
   { value: 'kg', label: 'Kilograms (kg)' },
@@ -89,22 +99,14 @@ const MEASUREMENT_UNITS = [
   { value: 'count', label: 'Count/Pieces' },
 ];
 
-const PACKING_TYPES = [
-  'pouch',
-  'bag',
-  'box',
-  'bottle',
-  'jar',
-  'tube',
-  'sachet',
-  'container',
-];
-
 const SellerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<ProductWithDetails[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [packingTypes, setPackingTypes] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('orders');
 
@@ -115,11 +117,17 @@ const SellerDashboard: React.FC = () => {
   const [basePrice, setBasePrice] = useState('');
   const [measurementUnit, setMeasurementUnit] = useState('g');
   const [packingType, setPackingType] = useState('pouch');
+  const [isOnSale, setIsOnSale] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState('');
   const [variants, setVariants] = useState<ProductVariant[]>([
-    { quantity: 50, price: 50, isDefault: true },
+    { quantity: 50, price: 50, isDefault: true, stockQuantity: 100 },
   ]);
   const [productImages, setProductImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+
+  // New category/packing type form
+  const [newCategory, setNewCategory] = useState('');
+  const [newPackingType, setNewPackingType] = useState('');
 
   useEffect(() => {
     if (!authLoading && !adminLoading) {
@@ -136,9 +144,19 @@ const SellerDashboard: React.FC = () => {
         navigate('/');
         return;
       }
-      fetchOrders();
+      fetchData();
     }
   }, [user, authLoading, isAdmin, adminLoading, navigate]);
+
+  const fetchData = async () => {
+    await Promise.all([
+      fetchOrders(),
+      fetchProducts(),
+      fetchCategories(),
+      fetchPackingTypes(),
+    ]);
+    setLoading(false);
+  };
 
   const fetchOrders = async () => {
     try {
@@ -158,27 +176,94 @@ const SellerDashboard: React.FC = () => {
       setOrders(parsedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (productsError) throw productsError;
+
+      // Fetch variants and images for each product
+      const productsWithDetails: ProductWithDetails[] = await Promise.all(
+        (productsData || []).map(async (product) => {
+          const [variantsRes, imagesRes] = await Promise.all([
+            supabase.from('product_variants').select('*').eq('product_id', product.id),
+            supabase.from('product_images').select('*').eq('product_id', product.id).order('display_order'),
+          ]);
+
+          return {
+            ...product,
+            variants: variantsRes.data || [],
+            images: imagesRes.data || [],
+          };
+        })
+      );
+
+      setProducts(productsWithDetails);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchPackingTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('packing_types')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setPackingTypes(data || []);
+    } catch (error) {
+      console.error('Error fetching packing types:', error);
     }
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
+      // If delivered, also update payment_status to 'paid' for COD orders
+      const order = orders.find(o => o.id === orderId);
+      const updates: { order_status: string; payment_status?: string } = { order_status: newStatus };
+      
+      if (newStatus === 'delivered' && order?.payment_method === 'cod') {
+        updates.payment_status = 'paid';
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ order_status: newStatus })
+        .update(updates)
         .eq('id', orderId);
 
       if (error) throw error;
 
       setOrders(prev => prev.map(order => 
-        order.id === orderId ? { ...order, order_status: newStatus } : order
+        order.id === orderId 
+          ? { ...order, order_status: newStatus, ...(updates.payment_status && { payment_status: updates.payment_status }) } 
+          : order
       ));
 
       toast({
         title: "Status Updated",
-        description: `Order status changed to ${newStatus}`,
+        description: `Order status changed to ${newStatus}${updates.payment_status ? ' (Payment marked as paid)' : ''}`,
       });
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -190,8 +275,190 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  const deleteOrder = async (orderId: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+
+      toast({
+        title: "Order Deleted",
+        description: "Order has been removed from the system",
+      });
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleProductStock = async (productId: string, isInStock: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_in_stock: isInStock })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, is_in_stock: isInStock } : p
+      ));
+
+      toast({
+        title: isInStock ? "Product In Stock" : "Product Out of Stock",
+        description: `Product stock status updated`,
+      });
+    } catch (error) {
+      console.error('Error updating stock:', error);
+    }
+  };
+
+  const toggleProductSale = async (productId: string, isOnSale: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_on_sale: isOnSale })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, is_on_sale: isOnSale } : p
+      ));
+
+      toast({
+        title: isOnSale ? "Sale Enabled" : "Sale Disabled",
+      });
+    } catch (error) {
+      console.error('Error updating sale status:', error);
+    }
+  };
+
+  const updateProductDiscount = async (productId: string, discount: number) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ discount_amount: discount })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, discount_amount: discount } : p
+      ));
+
+      toast({ title: "Discount Updated" });
+    } catch (error) {
+      console.error('Error updating discount:', error);
+    }
+  };
+
+  const deleteProduct = async (productId: string) => {
+    try {
+      // Delete images from storage first
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        for (const image of product.images) {
+          const path = image.image_url.split('/product-images/')[1];
+          if (path) {
+            await supabase.storage.from('product-images').remove([path]);
+          }
+        }
+      }
+
+      // Delete from database (cascades to variants and images)
+      const { error: variantsError } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', productId);
+
+      const { error: imagesError } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('product_id', productId);
+
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setProducts(prev => prev.filter(p => p.id !== productId));
+
+      toast({
+        title: "Product Deleted",
+        description: "Product has been removed from the store",
+      });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete product",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addCategory = async () => {
+    if (!newCategory.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert({ name: newCategory.trim() })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCategories(prev => [...prev, data]);
+      setNewCategory('');
+      toast({ title: "Category Added" });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message?.includes('duplicate') ? "Category already exists" : "Failed to add category",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addPackingType = async () => {
+    if (!newPackingType.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('packing_types')
+        .insert({ name: newPackingType.trim().toLowerCase() })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setPackingTypes(prev => [...prev, data]);
+      setNewPackingType('');
+      toast({ title: "Packing Type Added" });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message?.includes('duplicate') ? "Packing type already exists" : "Failed to add packing type",
+        variant: "destructive"
+      });
+    }
+  };
+
   const addVariant = () => {
-    setVariants([...variants, { quantity: 100, price: 100, isDefault: false }]);
+    setVariants([...variants, { quantity: 100, price: 100, isDefault: false, stockQuantity: 100 }]);
   };
 
   const removeVariant = (index: number) => {
@@ -249,6 +516,8 @@ const SellerDashboard: React.FC = () => {
           base_price: parseFloat(basePrice),
           measurement_unit: measurementUnit,
           packing_type: packingType,
+          is_on_sale: isOnSale,
+          discount_amount: parseFloat(discountAmount) || 0,
         })
         .select()
         .single();
@@ -261,6 +530,7 @@ const SellerDashboard: React.FC = () => {
         quantity: v.quantity,
         price: v.price,
         is_default: v.isDefault,
+        stock_quantity: v.stockQuantity,
       }));
 
       const { error: variantError } = await supabase
@@ -295,7 +565,7 @@ const SellerDashboard: React.FC = () => {
 
       toast({
         title: "Product Added!",
-        description: "Your product has been added successfully",
+        description: "Your product has been added successfully and is now visible to buyers",
       });
 
       // Reset form
@@ -305,8 +575,13 @@ const SellerDashboard: React.FC = () => {
       setBasePrice('');
       setMeasurementUnit('g');
       setPackingType('pouch');
-      setVariants([{ quantity: 50, price: 50, isDefault: true }]);
+      setIsOnSale(false);
+      setDiscountAmount('');
+      setVariants([{ quantity: 50, price: 50, isDefault: true, stockQuantity: 100 }]);
       setProductImages([]);
+
+      // Refresh products list
+      fetchProducts();
 
     } catch (error) {
       console.error('Error adding product:', error);
@@ -364,14 +639,22 @@ const SellerDashboard: React.FC = () => {
         </section>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" />
-              Orders
+              <span className="hidden sm:inline">Orders</span>
             </TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="w-4 h-4" />
-              Add Product
+              <span className="hidden sm:inline">Products</span>
+            </TabsTrigger>
+            <TabsTrigger value="add" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add New</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
 
@@ -398,7 +681,7 @@ const SellerDashboard: React.FC = () => {
                           <TableHead>Total</TableHead>
                           <TableHead>Payment</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -421,7 +704,11 @@ const SellerDashboard: React.FC = () => {
                             <TableCell>
                               <div className="text-sm">
                                 {order.items.map((item, i) => (
-                                  <div key={i}>{item.name} × {item.quantity}</div>
+                                  <div key={i}>
+                                    {item.name}
+                                    {item.selectedVariant && ` (${item.selectedVariant.weight})`}
+                                    {' × '}{item.quantity}
+                                  </div>
                                 ))}
                               </div>
                             </TableCell>
@@ -430,6 +717,7 @@ const SellerDashboard: React.FC = () => {
                               <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
                                 {order.payment_status}
                               </Badge>
+                              <p className="text-xs text-muted-foreground mt-1">{order.payment_method}</p>
                             </TableCell>
                             <TableCell>
                               <Badge className={`${getStatusColor(order.order_status)} text-white`}>
@@ -437,21 +725,44 @@ const SellerDashboard: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Select
-                                value={order.order_status}
-                                onValueChange={(value) => updateOrderStatus(order.id, value)}
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {ORDER_STATUSES.map((status) => (
-                                    <SelectItem key={status.value} value={status.value}>
-                                      {status.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={order.order_status}
+                                  onValueChange={(value) => updateOrderStatus(order.id, value)}
+                                >
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ORDER_STATUSES.map((status) => (
+                                      <SelectItem key={status.value} value={status.value}>
+                                        {status.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete this order. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deleteOrder(order.id)}>
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -463,8 +774,123 @@ const SellerDashboard: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Add Product Tab */}
+          {/* Manage Products Tab */}
           <TabsContent value="products" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Manage Products ({products.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {products.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No products yet</p>
+                ) : (
+                  <div className="grid gap-4">
+                    {products.map((product) => (
+                      <div key={product.id} className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg">
+                        <div className="w-24 h-24 flex-shrink-0">
+                          {product.images[0] ? (
+                            <img
+                              src={product.images[0].image_url}
+                              alt={product.name}
+                              className="w-full h-full object-cover rounded-md"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-muted rounded-md flex items-center justify-center">
+                              <Package className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="font-semibold">{product.name}</h3>
+                              <p className="text-sm text-muted-foreground">{product.category}</p>
+                              <p className="text-sm">Base: ₹{product.base_price} / {product.measurement_unit}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              {product.is_on_sale && (
+                                <Badge variant="secondary" className="bg-red-500 text-white">
+                                  <Percent className="w-3 h-3 mr-1" />
+                                  ₹{product.discount_amount} OFF
+                                </Badge>
+                              )}
+                              {!product.is_in_stock && (
+                                <Badge variant="destructive">Out of Stock</Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={product.is_in_stock}
+                                onCheckedChange={(checked) => toggleProductStock(product.id, checked)}
+                              />
+                              <Label className="text-sm">In Stock</Label>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={product.is_on_sale}
+                                onCheckedChange={(checked) => toggleProductSale(product.id, checked)}
+                              />
+                              <Label className="text-sm">On Sale</Label>
+                            </div>
+
+                            {product.is_on_sale && (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  className="w-20 h-8"
+                                  value={product.discount_amount}
+                                  onChange={(e) => updateProductDiscount(product.id, parseFloat(e.target.value) || 0)}
+                                  placeholder="₹"
+                                />
+                                <span className="text-sm text-muted-foreground">off</span>
+                              </div>
+                            )}
+
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Product?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete "{product.name}" and all its variants and images. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteProduct(product.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+
+                          <div className="text-sm text-muted-foreground">
+                            Variants: {product.variants.map(v => `${v.quantity}${product.measurement_unit} = ₹${v.price}`).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Add Product Tab */}
+          <TabsContent value="add" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -491,8 +917,8 @@ const SellerDashboard: React.FC = () => {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -541,12 +967,32 @@ const SellerDashboard: React.FC = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PACKING_TYPES.map((type) => (
-                          <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>
+                        {packingTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.name} className="capitalize">{type.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Sale Settings */}
+                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Switch checked={isOnSale} onCheckedChange={setIsOnSale} />
+                    <Label>Enable Sale / Discount</Label>
+                  </div>
+                  {isOnSale && (
+                    <div className="flex items-center gap-2">
+                      <Label>Discount Amount (₹)</Label>
+                      <Input
+                        type="number"
+                        value={discountAmount}
+                        onChange={(e) => setDiscountAmount(e.target.value)}
+                        placeholder="e.g. 20"
+                        className="w-32"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Variants */}
@@ -558,8 +1004,8 @@ const SellerDashboard: React.FC = () => {
                     </Button>
                   </div>
                   {variants.map((variant, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <div className="flex-1">
+                    <div key={index} className="flex flex-wrap items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="flex-1 min-w-[100px]">
                         <Label className="text-xs">Quantity ({measurementUnit})</Label>
                         <Input
                           type="number"
@@ -568,13 +1014,22 @@ const SellerDashboard: React.FC = () => {
                           placeholder="50"
                         />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-[100px]">
                         <Label className="text-xs">Price (₹)</Label>
                         <Input
                           type="number"
                           value={variant.price}
                           onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value))}
                           placeholder="50"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-[100px]">
+                        <Label className="text-xs">Stock Qty</Label>
+                        <Input
+                          type="number"
+                          value={variant.stockQuantity}
+                          onChange={(e) => updateVariant(index, 'stockQuantity', parseFloat(e.target.value))}
+                          placeholder="100"
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -645,10 +1100,69 @@ const SellerDashboard: React.FC = () => {
                   disabled={uploading}
                   className="w-full gradient-hero text-primary-foreground"
                 >
-                  {uploading ? 'Adding Product...' : 'Add Product'}
+                  {uploading ? 'Adding Product...' : 'Create Product'}
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Categories Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="w-5 h-5" />
+                    Categories
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="New category name"
+                    />
+                    <Button onClick={addCategory} disabled={!newCategory.trim()}>
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((cat) => (
+                      <Badge key={cat.id} variant="outline">{cat.name}</Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Packing Types Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Packing Types
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newPackingType}
+                      onChange={(e) => setNewPackingType(e.target.value)}
+                      placeholder="New packing type"
+                    />
+                    <Button onClick={addPackingType} disabled={!newPackingType.trim()}>
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {packingTypes.map((type) => (
+                      <Badge key={type.id} variant="outline" className="capitalize">{type.name}</Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>

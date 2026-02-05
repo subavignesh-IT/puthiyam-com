@@ -50,19 +50,22 @@ const CheckoutForm: React.FC = () => {
         customer_address: deliveryType === 'shipping' ? formData.address : null,
         delivery_type: deliveryType,
         payment_method: paymentMethod,
-        payment_status: isPaid ? 'paid' : 'pending',
+        // Online payment is 'paid', COD is 'pending' until delivered
+        payment_status: paymentMethod === 'online' ? 'paid' : 'pending',
+        order_status: 'pending',
         items: items.map(item => ({
           id: item.id,
           name: item.name,
-          price: item.price,
+          price: item.selectedVariant ? item.selectedVariant.price : item.price,
           quantity: item.quantity,
-        })),
+          selectedVariant: item.selectedVariant ? { weight: item.selectedVariant.weight, price: item.selectedVariant.price } : undefined,
+        })) as unknown as import('@/integrations/supabase/types').Json,
         subtotal: subtotal,
         shipping_cost: shippingCost,
         total: grandTotal,
       };
 
-      const { error } = await supabase.from('orders').insert(orderData);
+      const { error } = await supabase.from('orders').insert([orderData]);
       if (error) {
         console.error('Error saving order:', error);
       }
@@ -218,12 +221,23 @@ const CheckoutForm: React.FC = () => {
     );
   }
 
+  const handlePaymentTimeout = () => {
+    setShowQR(false);
+    toast({
+      title: "Payment Timeout",
+      description: "Your order has been cancelled due to payment timeout. Please try again.",
+      variant: "destructive",
+      duration: 5000,
+    });
+  };
+
   if (showQR) {
     return (
       <QRCodePayment
         total={grandTotal}
         onPaymentComplete={handlePaymentSuccess}
         onBack={() => setShowQR(false)}
+        onTimeout={handlePaymentTimeout}
       />
     );
   }

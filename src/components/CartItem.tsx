@@ -11,6 +11,13 @@ interface CartItemProps {
 const CartItem: React.FC<CartItemProps> = ({ item }) => {
   const { updateQuantity, removeFromCart } = useCart();
 
+  // Generate cart item ID for removal/update
+  const cartItemId = item.selectedVariant 
+    ? `${item.id}-${item.selectedVariant.weight}` 
+    : item.id;
+
+  const price = item.selectedVariant ? item.selectedVariant.price : item.price;
+
   return (
     <div className="flex gap-4 p-4 bg-card rounded-lg shadow-soft animate-fade-in">
       <img
@@ -21,16 +28,21 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
       <div className="flex-1 min-w-0">
         <h3 className="font-serif font-semibold text-foreground truncate">
           {item.name}
+          {item.selectedVariant && (
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              ({item.selectedVariant.weight})
+            </span>
+          )}
         </h3>
         <p className="text-sm text-muted-foreground">
-          ₹{item.price} × {item.quantity} = <span className="font-semibold text-primary">₹{item.price * item.quantity}</span>
+          ₹{price} × {item.quantity} = <span className="font-semibold text-primary">₹{price * item.quantity}</span>
         </p>
         <div className="flex items-center gap-2 mt-2">
           <Button
             variant="outline"
             size="icon"
             className="h-8 w-8"
-            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+            onClick={() => updateQuantity(cartItemId, item.quantity - 1)}
           >
             <Minus className="w-3 h-3" />
           </Button>
@@ -39,7 +51,7 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
             variant="outline"
             size="icon"
             className="h-8 w-8"
-            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+            onClick={() => updateQuantity(cartItemId, item.quantity + 1)}
           >
             <Plus className="w-3 h-3" />
           </Button>
@@ -47,7 +59,7 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
             variant="ghost"
             size="icon"
             className="h-8 w-8 ml-auto text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => removeFromCart(item.id)}
+            onClick={() => removeFromCart(cartItemId)}
           >
             <Trash2 className="w-4 h-4" />
           </Button>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Send, Star, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
-import { products } from '@/data/products';
+import { ArrowLeft, Plus, Send, Star, Upload, Trash2 } from 'lucide-react';
+import { products as staticProducts } from '@/data/products';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/context/CartContext';
@@ -13,8 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { ProductVariant } from '@/types/product';
+import { Product, ProductVariant } from '@/types/product';
 
 interface Review {
   id: string;
@@ -33,27 +34,22 @@ const ProductDetail: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
   const [reviewImage, setReviewImage] = useState<File | null>(null);
   const [reviewImagePreview, setReviewImagePreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const product = products.find(p => p.id === id);
-
-  // Generate additional product images
-  const productImages = product ? [
-    product.image,
-    product.image.replace('w=400', 'w=500'),
-    product.image.replace('w=400', 'w=600'),
-  ] : [];
-
   useEffect(() => {
     if (id) {
+      fetchProduct();
       fetchReviews();
     }
   }, [id]);
@@ -65,13 +61,79 @@ const ProductDetail: React.FC = () => {
   }, [product, selectedVariant]);
 
   useEffect(() => {
-    // Check if current user is admin
     if (user?.email === ADMIN_EMAIL) {
       setIsAdmin(true);
     } else {
       setIsAdmin(false);
     }
   }, [user]);
+
+  const fetchProduct = async () => {
+    setLoading(true);
+    try {
+      // Try to fetch from database first
+      const { data: dbProduct, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (!error && dbProduct) {
+        // Fetch variants and images
+        const [variantsRes, imagesRes] = await Promise.all([
+          supabase.from('product_variants').select('*').eq('product_id', id).order('price'),
+          supabase.from('product_images').select('*').eq('product_id', id).order('display_order'),
+        ]);
+
+        const variants = variantsRes.data || [];
+        const images = imagesRes.data || [];
+        const primaryImage = images.find(img => img.is_primary) || images[0];
+        const defaultVariant = variants.find(v => v.is_default) || variants[0];
+
+        const fetchedProduct: Product = {
+          id: dbProduct.id,
+          name: dbProduct.name,
+          price: defaultVariant?.price || dbProduct.base_price,
+          category: dbProduct.category,
+          image: primaryImage?.image_url || '/placeholder.svg',
+          description: dbProduct.description || '',
+          rating: 0,
+          reviewCount: 0,
+          variants: variants.map(v => ({
+            weight: `${v.quantity}${dbProduct.measurement_unit}`,
+            price: v.price,
+          })),
+          isInStock: dbProduct.is_in_stock,
+          isOnSale: dbProduct.is_on_sale,
+          discountAmount: dbProduct.discount_amount,
+        };
+
+        setProduct(fetchedProduct);
+        setProductImages(images.length > 0 ? images.map(img => img.image_url) : [fetchedProduct.image]);
+      } else {
+        // Fall back to static products
+        const staticProduct = staticProducts.find(p => p.id === id);
+        if (staticProduct) {
+          setProduct(staticProduct);
+          setProductImages([
+            staticProduct.image,
+            staticProduct.image.replace('w=400', 'w=500'),
+            staticProduct.image.replace('w=400', 'w=600'),
+          ]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      // Fall back to static products
+      const staticProduct = staticProducts.find(p => p.id === id);
+      if (staticProduct) {
+        setProduct(staticProduct);
+        setProductImages([staticProduct.image]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchReviews = async () => {
     const { data, error } = await supabase
@@ -143,14 +205,13 @@ const ProductDetail: React.FC = () => {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
 
     let imageUrl = null;
     if (reviewImage) {
       imageUrl = await uploadReviewImage();
     }
 
-    // Get user's display name from profile or email
     const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Customer';
 
     const { error } = await supabase.from('reviews').insert({
@@ -162,7 +223,7 @@ const ProductDetail: React.FC = () => {
       image_url: imageUrl,
     });
 
-    setLoading(false);
+    setSubmitting(false);
 
     if (error) {
       toast({
@@ -208,12 +269,7 @@ const ProductDetail: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
-    
-    const productToAdd = selectedVariant 
-      ? { ...product, price: selectedVariant.price, selectedVariant }
-      : product;
-    
-    addToCart(productToAdd);
+    addToCart(product, selectedVariant || undefined);
   };
 
   const renderStars = (rating: number, interactive = false, onRate?: (r: number) => void) => {
@@ -231,6 +287,22 @@ const ProductDetail: React.FC = () => {
   };
 
   const currentPrice = selectedVariant?.price || product?.price || 0;
+  const finalPrice = product?.isOnSale && product?.discountAmount
+    ? Math.max(0, currentPrice - product.discountAmount)
+    : currentPrice;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header />
+        <main className="container mx-auto px-4 py-8 text-center">
+          <div className="animate-pulse text-muted-foreground">Loading product...</div>
+        </main>
+        <Footer />
+        <BottomNav />
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -276,18 +348,29 @@ const ProductDetail: React.FC = () => {
                 alt={product.name}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
+              {/* Sale/Stock badges */}
+              <div className="absolute top-4 left-4 flex flex-col gap-2">
+                {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
+                  <Badge className="bg-red-500 text-white shadow-lg">
+                    ₹{product.discountAmount} OFF
+                  </Badge>
+                )}
+                {product.isInStock === false && (
+                  <Badge variant="destructive">Out of Stock</Badge>
+                )}
+              </div>
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
                 <span className="bg-white/90 text-foreground px-4 py-2 rounded-full text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-lg">
                   Tap to view
                 </span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-2">
               {productImages.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedImage(idx)}
-                  className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 active:scale-95 ${
+                  className={`w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 active:scale-95 ${
                     selectedImage === idx 
                       ? 'border-primary shadow-[0_0_10px_hsl(var(--primary))]' 
                       : 'border-border hover:border-primary/50'
@@ -340,16 +423,22 @@ const ProductDetail: React.FC = () => {
               {reviews.length} customer {reviews.length === 1 ? 'review' : 'reviews'}
             </div>
 
-            <div className="text-3xl font-bold text-primary animate-pulse-soft">
-              ₹{currentPrice}
+            <div className="flex items-center gap-3">
+              <span className="text-3xl font-bold text-primary animate-pulse-soft">
+                ₹{finalPrice}
+              </span>
+              {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
+                <span className="text-xl text-muted-foreground line-through">₹{currentPrice}</span>
+              )}
             </div>
 
             <Button
               onClick={handleAddToCart}
-              className="w-full gradient-hero text-primary-foreground text-lg py-6 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200 shadow-elevated"
+              disabled={product.isInStock === false}
+              className="w-full gradient-hero text-primary-foreground text-lg py-6 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200 shadow-elevated disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-5 h-5 mr-2" />
-              Add to Cart
+              {product.isInStock === false ? 'Out of Stock' : 'Add to Cart'}
             </Button>
           </div>
         </div>
@@ -421,11 +510,11 @@ const ProductDetail: React.FC = () => {
 
               <Button
                 onClick={handleSubmitReview}
-                disabled={loading}
+                disabled={submitting}
                 className="gradient-hero text-primary-foreground hover:scale-105 active:scale-95 transition-transform"
               >
                 <Send className="w-4 h-4 mr-2" />
-                {loading ? 'Submitting...' : 'Submit Review'}
+                {submitting ? 'Submitting...' : 'Submit Review'}
               </Button>
             </CardContent>
           </Card>
@@ -451,7 +540,6 @@ const ProductDetail: React.FC = () => {
                         <span className="text-xs text-muted-foreground">
                           {new Date(review.created_at).toLocaleDateString()}
                         </span>
-                        {/* Admin delete button or user's own review delete */}
                         {(isAdmin || user?.id === review.user_id) && (
                           <Button
                             variant="ghost"
