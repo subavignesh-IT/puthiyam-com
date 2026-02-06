@@ -106,6 +106,8 @@ const ProductDetail: React.FC = () => {
           isInStock: dbProduct.is_in_stock,
           isOnSale: dbProduct.is_on_sale,
           discountAmount: dbProduct.discount_amount,
+          discountType: (dbProduct as any).discount_type || 'amount',
+          saleEndTime: (dbProduct as any).sale_end_time,
         };
 
         setProduct(fetchedProduct);
@@ -287,9 +289,14 @@ const ProductDetail: React.FC = () => {
   };
 
   const currentPrice = selectedVariant?.price || product?.price || 0;
-  const finalPrice = product?.isOnSale && product?.discountAmount
-    ? Math.max(0, currentPrice - product.discountAmount)
-    : currentPrice;
+  const calculateFinalPrice = () => {
+    if (!product?.isOnSale || !product?.discountAmount) return currentPrice;
+    if (product.discountType === 'percentage') {
+      return Math.max(0, Math.round(currentPrice - (currentPrice * product.discountAmount / 100)));
+    }
+    return Math.max(0, currentPrice - product.discountAmount);
+  };
+  const finalPrice = calculateFinalPrice();
 
   if (loading) {
     return (
@@ -352,7 +359,7 @@ const ProductDetail: React.FC = () => {
               <div className="absolute top-4 left-4 flex flex-col gap-2">
                 {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
                   <Badge className="bg-red-500 text-white shadow-lg">
-                    ₹{product.discountAmount} OFF
+                    {product.discountType === 'percentage' ? `${product.discountAmount}% OFF` : `₹${product.discountAmount} OFF`}
                   </Badge>
                 )}
                 {product.isInStock === false && (
@@ -412,7 +419,7 @@ const ProductDetail: React.FC = () => {
                           : 'border-border hover:border-primary/50 bg-background'
                       }`}
                     >
-                      {variant.weight} - ₹{variant.price}
+                      {variant.weight}
                     </button>
                   ))}
                 </div>

@@ -22,9 +22,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     : product.price;
 
   // Calculate discounted price if on sale
-  const finalPrice = product.isOnSale && product.discountAmount
-    ? Math.max(0, displayPrice - product.discountAmount)
-    : displayPrice;
+  const calculateFinalPrice = () => {
+    if (!product.isOnSale || !product.discountAmount) return displayPrice;
+    if (product.discountType === 'percentage') {
+      return Math.max(0, Math.round(displayPrice - (displayPrice * product.discountAmount / 100)));
+    }
+    return Math.max(0, displayPrice - product.discountAmount);
+  };
+  const finalPrice = calculateFinalPrice();
 
   return (
     <Card 
@@ -41,7 +46,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
             <Badge className="bg-red-500 text-white text-xs shadow-lg">
               <Percent className="w-3 h-3 mr-1" />
-              ₹{product.discountAmount} OFF
+              {product.discountType === 'percentage' ? `${product.discountAmount}%` : `₹${product.discountAmount}`} OFF
             </Badge>
           )}
           {product.isInStock === false && (

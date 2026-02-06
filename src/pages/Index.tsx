@@ -55,6 +55,11 @@ const Index: React.FC = () => {
           const primaryImage = images.find(img => img.is_primary) || images[0];
           const defaultVariant = variants.find(v => v.is_default) || variants[0];
 
+          // Check if sale has expired
+          const saleEndTime = (product as any).sale_end_time;
+          const isSaleExpired = saleEndTime && new Date(saleEndTime) < new Date();
+          const isOnSale = product.is_on_sale && !isSaleExpired;
+
           return {
             id: product.id,
             name: product.name,
@@ -69,8 +74,10 @@ const Index: React.FC = () => {
               price: v.price,
             })),
             isInStock: product.is_in_stock,
-            isOnSale: product.is_on_sale,
+            isOnSale: isOnSale,
             discountAmount: product.discount_amount,
+            discountType: (product as any).discount_type || 'amount',
+            saleEndTime: saleEndTime,
           };
         })
       );

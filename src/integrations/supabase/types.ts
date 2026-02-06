@@ -181,6 +181,7 @@ export type Database = {
           created_at: string
           description: string | null
           discount_amount: number
+          discount_type: string | null
           id: string
           is_active: boolean
           is_in_stock: boolean
@@ -188,6 +189,7 @@ export type Database = {
           measurement_unit: string
           name: string
           packing_type: string | null
+          sale_end_time: string | null
           seller_id: string
           updated_at: string
         }
@@ -197,6 +199,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           discount_amount?: number
+          discount_type?: string | null
           id?: string
           is_active?: boolean
           is_in_stock?: boolean
@@ -204,6 +207,7 @@ export type Database = {
           measurement_unit?: string
           name: string
           packing_type?: string | null
+          sale_end_time?: string | null
           seller_id: string
           updated_at?: string
         }
@@ -213,6 +217,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           discount_amount?: number
+          discount_type?: string | null
           id?: string
           is_active?: boolean
           is_in_stock?: boolean
@@ -220,6 +225,7 @@ export type Database = {
           measurement_unit?: string
           name?: string
           packing_type?: string | null
+          sale_end_time?: string | null
           seller_id?: string
           updated_at?: string
         }
