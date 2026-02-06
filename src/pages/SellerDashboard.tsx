@@ -41,7 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings } from 'lucide-react';
+import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X } from 'lucide-react';
 import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
 
 interface OrderItem {
@@ -119,6 +119,9 @@ const SellerDashboard: React.FC = () => {
   const [packingType, setPackingType] = useState('pouch');
   const [isOnSale, setIsOnSale] = useState(false);
   const [discountAmount, setDiscountAmount] = useState('');
+  const [discountType, setDiscountType] = useState<'amount' | 'percentage'>('amount');
+  const [isLimitedSale, setIsLimitedSale] = useState(false);
+  const [saleEndTime, setSaleEndTime] = useState('');
   const [variants, setVariants] = useState<ProductVariant[]>([
     { quantity: 50, price: 50, isDefault: true, stockQuantity: 100 },
   ]);
@@ -324,15 +327,20 @@ const SellerDashboard: React.FC = () => {
 
   const toggleProductSale = async (productId: string, isOnSale: boolean) => {
     try {
+      const updates: any = { is_on_sale: isOnSale };
+      if (!isOnSale) {
+        updates.sale_end_time = null;
+      }
+      
       const { error } = await supabase
         .from('products')
-        .update({ is_on_sale: isOnSale })
+        .update(updates)
         .eq('id', productId);
 
       if (error) throw error;
 
       setProducts(prev => prev.map(p => 
-        p.id === productId ? { ...p, is_on_sale: isOnSale } : p
+        p.id === productId ? { ...p, is_on_sale: isOnSale, ...(isOnSale ? {} : { sale_end_time: null }) } : p
       ));
 
       toast({
@@ -343,22 +351,83 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  const updateProductDiscount = async (productId: string, discount: number) => {
+  const updateProductDiscount = async (productId: string, discount: number, type: 'amount' | 'percentage') => {
     try {
       const { error } = await supabase
         .from('products')
-        .update({ discount_amount: discount })
+        .update({ discount_amount: discount, discount_type: type })
         .eq('id', productId);
 
       if (error) throw error;
 
       setProducts(prev => prev.map(p => 
-        p.id === productId ? { ...p, discount_amount: discount } : p
+        p.id === productId ? { ...p, discount_amount: discount, discount_type: type } : p
       ));
 
       toast({ title: "Discount Updated" });
     } catch (error) {
       console.error('Error updating discount:', error);
+    }
+  };
+
+  const updateProductSaleEndTime = async (productId: string, endTime: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ sale_end_time: endTime })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, sale_end_time: endTime } : p
+      ));
+
+      toast({ title: endTime ? "Sale Timer Set" : "Sale Timer Removed" });
+    } catch (error) {
+      console.error('Error updating sale end time:', error);
+    }
+  };
+
+  const deleteCategory = async (categoryId: string) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      setCategories(prev => prev.filter(c => c.id !== categoryId));
+      toast({ title: "Category Deleted" });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deletePackingType = async (packingTypeId: string) => {
+    try {
+      const { error } = await supabase
+        .from('packing_types')
+        .delete()
+        .eq('id', packingTypeId);
+
+      if (error) throw error;
+
+      setPackingTypes(prev => prev.filter(p => p.id !== packingTypeId));
+      toast({ title: "Packing Type Deleted" });
+    } catch (error) {
+      console.error('Error deleting packing type:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete packing type",
+        variant: "destructive"
+      });
     }
   };
 
@@ -518,6 +587,8 @@ const SellerDashboard: React.FC = () => {
           packing_type: packingType,
           is_on_sale: isOnSale,
           discount_amount: parseFloat(discountAmount) || 0,
+          discount_type: discountType,
+          sale_end_time: isLimitedSale && saleEndTime ? new Date(saleEndTime).toISOString() : null,
         })
         .select()
         .single();
@@ -577,6 +648,9 @@ const SellerDashboard: React.FC = () => {
       setPackingType('pouch');
       setIsOnSale(false);
       setDiscountAmount('');
+      setDiscountType('amount');
+      setIsLimitedSale(false);
+      setSaleEndTime('');
       setVariants([{ quantity: 50, price: 50, isDefault: true, stockQuantity: 100 }]);
       setProductImages([]);
 
@@ -841,15 +915,51 @@ const SellerDashboard: React.FC = () => {
                             </div>
 
                             {product.is_on_sale && (
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Select
+                                  value={product.discount_type || 'amount'}
+                                  onValueChange={(value: 'amount' | 'percentage') => updateProductDiscount(product.id, product.discount_amount, value)}
+                                >
+                                  <SelectTrigger className="w-20 h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="amount">₹</SelectItem>
+                                    <SelectItem value="percentage">%</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <Input
                                   type="number"
                                   className="w-20 h-8"
                                   value={product.discount_amount}
-                                  onChange={(e) => updateProductDiscount(product.id, parseFloat(e.target.value) || 0)}
-                                  placeholder="₹"
+                                  onChange={(e) => updateProductDiscount(product.id, parseFloat(e.target.value) || 0, (product.discount_type as 'amount' | 'percentage') || 'amount')}
+                                  placeholder="Value"
                                 />
-                                <span className="text-sm text-muted-foreground">off</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {product.discount_type === 'percentage' ? '% off' : 'off'}
+                                </span>
+                              </div>
+                            )}
+
+                            {product.is_on_sale && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-muted-foreground" />
+                                <Input
+                                  type="datetime-local"
+                                  className="w-auto h-8 text-xs"
+                                  value={product.sale_end_time ? new Date(product.sale_end_time).toISOString().slice(0, 16) : ''}
+                                  onChange={(e) => updateProductSaleEndTime(product.id, e.target.value ? new Date(e.target.value).toISOString() : null)}
+                                />
+                                {product.sale_end_time && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="w-6 h-6"
+                                    onClick={() => updateProductSaleEndTime(product.id, null)}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                )}
                               </div>
                             )}
 
@@ -982,16 +1092,49 @@ const SellerDashboard: React.FC = () => {
                     <Label>Enable Sale / Discount</Label>
                   </div>
                   {isOnSale && (
-                    <div className="flex items-center gap-2">
-                      <Label>Discount Amount (₹)</Label>
-                      <Input
-                        type="number"
-                        value={discountAmount}
-                        onChange={(e) => setDiscountAmount(e.target.value)}
-                        placeholder="e.g. 20"
-                        className="w-32"
-                      />
-                    </div>
+                    <>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Label>Discount Type:</Label>
+                          <Select value={discountType} onValueChange={(v: 'amount' | 'percentage') => setDiscountType(v)}>
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="amount">Amount (₹)</SelectItem>
+                              <SelectItem value="percentage">Percentage (%)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label>{discountType === 'amount' ? 'Amount (₹)' : 'Percentage (%)'}</Label>
+                          <Input
+                            type="number"
+                            value={discountAmount}
+                            onChange={(e) => setDiscountAmount(e.target.value)}
+                            placeholder={discountType === 'amount' ? 'e.g. 20' : 'e.g. 10'}
+                            className="w-24"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Switch checked={isLimitedSale} onCheckedChange={setIsLimitedSale} />
+                          <Label>Limited Time Sale</Label>
+                        </div>
+                        {isLimitedSale && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                            <Input
+                              type="datetime-local"
+                              value={saleEndTime}
+                              onChange={(e) => setSaleEndTime(e.target.value)}
+                              className="w-auto"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -1130,7 +1273,15 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {categories.map((cat) => (
-                      <Badge key={cat.id} variant="outline">{cat.name}</Badge>
+                      <Badge key={cat.id} variant="outline" className="flex items-center gap-1 pr-1">
+                        {cat.name}
+                        <button
+                          onClick={() => deleteCategory(cat.id)}
+                          className="ml-1 p-0.5 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
                     ))}
                   </div>
                 </CardContent>
@@ -1157,7 +1308,15 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {packingTypes.map((type) => (
-                      <Badge key={type.id} variant="outline" className="capitalize">{type.name}</Badge>
+                      <Badge key={type.id} variant="outline" className="capitalize flex items-center gap-1 pr-1">
+                        {type.name}
+                        <button
+                          onClick={() => deletePackingType(type.id)}
+                          className="ml-1 p-0.5 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
                     ))}
                   </div>
                 </CardContent>

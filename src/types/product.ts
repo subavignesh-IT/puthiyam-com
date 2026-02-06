@@ -16,6 +16,8 @@ export interface Product {
   isInStock?: boolean;
   isOnSale?: boolean;
   discountAmount?: number;
+  discountType?: 'amount' | 'percentage';
+  saleEndTime?: string | null;
 }
 
 export interface CartItem extends Product {
@@ -57,6 +59,8 @@ export interface DbProduct {
   is_in_stock: boolean;
   is_on_sale: boolean;
   discount_amount: number;
+  discount_type: string;
+  sale_end_time: string | null;
   created_at: string;
   updated_at: string;
 }
