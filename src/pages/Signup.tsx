@@ -105,7 +105,7 @@ const Signup: React.FC = () => {
                     type="text"
                     value={formData.fullName}
                     onChange={handleInputChange}
-                    placeholder="Enter your full name"
+                    placeholder="e.g. Rajesh Kumar"
                     className="pl-10"
                     required
                   />
@@ -122,7 +122,7 @@ const Signup: React.FC = () => {
                     type="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    placeholder="Enter your email"
+                    placeholder="e.g. rajesh@example.com"
                     className="pl-10"
                     required
                   />
@@ -139,7 +139,7 @@ const Signup: React.FC = () => {
                     type="tel"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder="10-digit phone number"
+                    placeholder="e.g. 9876543210"
                     maxLength={10}
                     className="pl-10"
                     required
@@ -157,7 +157,7 @@ const Signup: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder="Create a password"
+                    placeholder="e.g. ••••••••"
                     className="pl-10 pr-10"
                     required
                   />
@@ -181,7 +181,7 @@ const Signup: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    placeholder="Confirm your password"
+                    placeholder="Re-enter password"
                     className="pl-10"
                     required
                   />

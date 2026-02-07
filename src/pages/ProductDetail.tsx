@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Send, Star, Upload, Trash2 } from 'lucide-react';
-import { products as staticProducts } from '@/data/products';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/context/CartContext';
@@ -113,25 +112,12 @@ const ProductDetail: React.FC = () => {
         setProduct(fetchedProduct);
         setProductImages(images.length > 0 ? images.map(img => img.image_url) : [fetchedProduct.image]);
       } else {
-        // Fall back to static products
-        const staticProduct = staticProducts.find(p => p.id === id);
-        if (staticProduct) {
-          setProduct(staticProduct);
-          setProductImages([
-            staticProduct.image,
-            staticProduct.image.replace('w=400', 'w=500'),
-            staticProduct.image.replace('w=400', 'w=600'),
-          ]);
-        }
+        // Product not found in database
+        setProduct(null);
       }
     } catch (error) {
       console.error('Error fetching product:', error);
-      // Fall back to static products
-      const staticProduct = staticProducts.find(p => p.id === id);
-      if (staticProduct) {
-        setProduct(staticProduct);
-        setProductImages([staticProduct.image]);
-      }
+      setProduct(null);
     } finally {
       setLoading(false);
     }
@@ -358,7 +344,7 @@ const ProductDetail: React.FC = () => {
               {/* Sale/Stock badges */}
               <div className="absolute top-4 left-4 flex flex-col gap-2">
                 {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
-                  <Badge className="bg-red-500 text-white shadow-lg">
+                  <Badge variant="destructive" className="shadow-lg">
                     {product.discountType === 'percentage' ? `${product.discountAmount}% OFF` : `₹${product.discountAmount} OFF`}
                   </Badge>
                 )}

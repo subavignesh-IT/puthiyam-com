@@ -1,5 +1,4 @@
 import React from 'react';
-import { categories as defaultCategories } from '@/data/products';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -12,9 +11,9 @@ interface CategoryFilterProps {
 const CategoryFilter: React.FC<CategoryFilterProps> = ({
   selectedCategory,
   onCategoryChange,
-  categories,
+  categories = ['All'],
 }) => {
-  const displayCategories = categories || defaultCategories;
+  const displayCategories = categories;
 
   return (
     <ScrollArea className="w-full whitespace-nowrap">

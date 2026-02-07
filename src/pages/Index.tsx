@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { products as staticProducts } from '@/data/products';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
@@ -90,13 +89,9 @@ const Index: React.FC = () => {
     }
   };
 
-  // Combine database products with static products (for backwards compatibility)
+  // Use only database products
   const allProducts = useMemo(() => {
-    // DB products take priority, static products as fallback
-    if (dbProducts.length > 0) {
-      return dbProducts;
-    }
-    return staticProducts;
+    return dbProducts;
   }, [dbProducts]);
 
   const filteredProducts = useMemo(() => {

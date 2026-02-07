@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Flame } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { products } from '@/data/products';
 import { Product } from '@/types/product';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -26,16 +25,15 @@ const Trending: React.FC = () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { data: orders, error } = await supabase
+      const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('items')
         .gte('created_at', thirtyDaysAgo.toISOString());
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      // Count product purchases
+      // Count product purchases from orders
       const productCounts: Record<string, number> = {};
-
       orders?.forEach((order) => {
         const items = order.items as Array<{ id: string; quantity: number }>;
         items.forEach((item) => {
@@ -43,20 +41,65 @@ const Trending: React.FC = () => {
         });
       });
 
-      // Map to products with purchase counts
-      const trending = products
-        .map((product) => ({
-          ...product,
-          purchaseCount: productCounts[product.id] || 0,
-        }))
+      // Fetch all active products from database
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .eq('is_in_stock', true);
+
+      if (productsError) throw productsError;
+
+      // Fetch variants and images for each product
+      const productsWithDetails: TrendingProduct[] = await Promise.all(
+        (productsData || []).map(async (product) => {
+          const [variantsRes, imagesRes] = await Promise.all([
+            supabase.from('product_variants').select('*').eq('product_id', product.id).order('price'),
+            supabase.from('product_images').select('*').eq('product_id', product.id).order('display_order'),
+          ]);
+
+          const variants = variantsRes.data || [];
+          const images = imagesRes.data || [];
+          const primaryImage = images.find(img => img.is_primary) || images[0];
+          const defaultVariant = variants.find(v => v.is_default) || variants[0];
+
+          // Check if sale has expired
+          const saleEndTime = product.sale_end_time;
+          const isSaleExpired = saleEndTime && new Date(saleEndTime) < new Date();
+          const isOnSale = product.is_on_sale && !isSaleExpired;
+
+          return {
+            id: product.id,
+            name: product.name,
+            price: defaultVariant?.price || product.base_price,
+            category: product.category,
+            image: primaryImage?.image_url || '/placeholder.svg',
+            description: product.description || '',
+            rating: 0,
+            reviewCount: 0,
+            variants: variants.map(v => ({
+              weight: `${v.quantity}${product.measurement_unit}`,
+              price: v.price,
+            })),
+            isInStock: product.is_in_stock,
+            isOnSale: isOnSale,
+            discountAmount: product.discount_amount,
+            discountType: (product.discount_type as 'amount' | 'percentage') || 'amount',
+            saleEndTime: saleEndTime,
+            purchaseCount: productCounts[product.id] || 0,
+          };
+        })
+      );
+
+      // Sort by purchase count and get top 10
+      const trending = productsWithDetails
         .sort((a, b) => b.purchaseCount - a.purchaseCount)
         .slice(0, 10);
 
       setTrendingProducts(trending);
     } catch (error) {
       console.error('Error fetching trending products:', error);
-      // Fallback to showing all products if error
-      setTrendingProducts(products.map(p => ({ ...p, purchaseCount: 0 })));
+      setTrendingProducts([]);
     } finally {
       setLoading(false);
     }

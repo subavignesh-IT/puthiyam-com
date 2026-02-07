@@ -84,7 +84,7 @@ const Login: React.FC = () => {
                     type="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    placeholder="Enter your email"
+                    placeholder="e.g. john@example.com"
                     className="pl-10"
                     required
                   />
@@ -101,7 +101,7 @@ const Login: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder="Enter your password"
+                    placeholder="e.g. ••••••••"
                     className="pl-10 pr-10"
                     required
                   />

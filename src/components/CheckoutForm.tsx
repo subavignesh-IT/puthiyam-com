@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useCustomerDefaults } from '@/hooks/useCustomerDefaults';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ import CheckoutBillImage from './CheckoutBillImage';
 const CheckoutForm: React.FC = () => {
   const { items, getTotal, getShippingCost, clearCart } = useCart();
   const { user } = useAuth();
+  const { defaults, loading: defaultsLoading, updateDefaults } = useCustomerDefaults();
   const [deliveryType, setDeliveryType] = useState<'shipping' | 'self-pickup'>('self-pickup');
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
   const [formData, setFormData] = useState({
@@ -27,6 +29,17 @@ const CheckoutForm: React.FC = () => {
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const billRef = useRef<HTMLDivElement>(null);
+
+  // Load customer defaults when available
+  useEffect(() => {
+    if (!defaultsLoading && defaults) {
+      setFormData({
+        name: defaults.name || '',
+        phone: defaults.phone || '',
+        address: defaults.address || '',
+      });
+    }
+  }, [defaults, defaultsLoading]);
 
   const subtotal = getTotal();
   const shippingCost = deliveryType === 'shipping' ? getShippingCost() : 0;
@@ -108,6 +121,13 @@ const CheckoutForm: React.FC = () => {
     // Save order to database
     await saveOrderToDatabase(true);
 
+    // Update customer defaults for next order
+    updateDefaults({
+      name: formData.name,
+      phone: formData.phone,
+      address: formData.address,
+    });
+
     // Generate bill image and share
     await generateAndShareBill(true);
 
@@ -133,6 +153,13 @@ const CheckoutForm: React.FC = () => {
 
     // Save order to database
     await saveOrderToDatabase(false);
+
+    // Update customer defaults for next order
+    updateDefaults({
+      name: formData.name,
+      phone: formData.phone,
+      address: formData.address,
+    });
 
     // Generate bill image and share
     await generateAndShareBill(false);
@@ -284,7 +311,7 @@ const CheckoutForm: React.FC = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                placeholder="Enter your full name"
+                placeholder="e.g. Rajesh Kumar"
                 required
               />
             </div>
@@ -295,7 +322,7 @@ const CheckoutForm: React.FC = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                placeholder="10-digit phone number"
+                placeholder="e.g. 9876543210"
                 maxLength={10}
                 required
               />
@@ -339,7 +366,7 @@ const CheckoutForm: React.FC = () => {
                 name="address"
                 value={formData.address}
                 onChange={handleInputChange}
-                placeholder="Enter your complete delivery address"
+                placeholder="e.g. 123, Main Street, Near Bus Stand, Chennai - 600001"
                 rows={3}
                 required
               />

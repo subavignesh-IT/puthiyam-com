@@ -41,8 +41,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X } from 'lucide-react';
+import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X, Share2, BarChart3 } from 'lucide-react';
 import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
+import SalesReportDashboard from '@/components/SalesReportDashboard';
+import OrderBillImage from '@/components/OrderBillImage';
+import html2canvas from 'html2canvas';
 
 interface OrderItem {
   id: string;
@@ -109,6 +112,8 @@ const SellerDashboard: React.FC = () => {
   const [packingTypes, setPackingTypes] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('orders');
+  const [editingProduct, setEditingProduct] = useState<ProductWithDetails | null>(null);
+  const billRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
 
   // Product form state
   const [productName, setProductName] = useState('');
@@ -300,6 +305,34 @@ const SellerDashboard: React.FC = () => {
         description: "Failed to delete order",
         variant: "destructive"
       });
+    }
+  };
+
+  const shareOrderBill = async (order: Order) => {
+    const billElement = billRefs.current[order.id];
+    if (billElement) {
+      try {
+        const canvas = await html2canvas(billElement, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+        
+        // Download the image
+        const link = document.createElement('a');
+        link.download = `PUTHIYAM_Bill_${order.id.slice(0, 8)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        // Open WhatsApp with a summary
+        const message = `🛒 *Order Bill from PUTHIYAM PRODUCTS*\n\n📋 Order: ${order.id.slice(0, 8).toUpperCase()}\n👤 Customer: ${order.customer_name}\n📞 Phone: ${order.customer_phone}\n💰 Total: ₹${order.total}\n${order.payment_status === 'paid' ? '✅ PAID' : '⏳ PENDING'}\n📦 Status: ${order.order_status.toUpperCase()}\n\n📎 Bill image attached`;
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://wa.me/919361284773?text=${encodedMessage}`, '_blank');
+
+        toast({ title: "Bill Generated", description: "Bill image downloaded and WhatsApp opened" });
+      } catch (error) {
+        console.error('Error generating bill:', error);
+        toast({ title: "Error", description: "Failed to generate bill image", variant: "destructive" });
+      }
     }
   };
 
@@ -640,19 +673,7 @@ const SellerDashboard: React.FC = () => {
       });
 
       // Reset form
-      setProductName('');
-      setProductDescription('');
-      setProductCategory('');
-      setBasePrice('');
-      setMeasurementUnit('g');
-      setPackingType('pouch');
-      setIsOnSale(false);
-      setDiscountAmount('');
-      setDiscountType('amount');
-      setIsLimitedSale(false);
-      setSaleEndTime('');
-      setVariants([{ quantity: 50, price: 50, isDefault: true, stockQuantity: 100 }]);
-      setProductImages([]);
+      resetForm();
 
       // Refresh products list
       fetchProducts();
@@ -662,6 +683,119 @@ const SellerDashboard: React.FC = () => {
       toast({
         title: "Error",
         description: "Failed to add product. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setProductName('');
+    setProductDescription('');
+    setProductCategory('');
+    setBasePrice('');
+    setMeasurementUnit('g');
+    setPackingType('pouch');
+    setIsOnSale(false);
+    setDiscountAmount('');
+    setDiscountType('amount');
+    setIsLimitedSale(false);
+    setSaleEndTime('');
+    setVariants([{ quantity: 50, price: 50, isDefault: true, stockQuantity: 100 }]);
+    setProductImages([]);
+    setEditingProduct(null);
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct || !productName || !productCategory || !basePrice) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Update product
+      const { error: productError } = await supabase
+        .from('products')
+        .update({
+          name: productName,
+          description: productDescription,
+          category: productCategory,
+          base_price: parseFloat(basePrice),
+          measurement_unit: measurementUnit,
+          packing_type: packingType,
+          is_on_sale: isOnSale,
+          discount_amount: parseFloat(discountAmount) || 0,
+          discount_type: discountType,
+          sale_end_time: isLimitedSale && saleEndTime ? new Date(saleEndTime).toISOString() : null,
+        })
+        .eq('id', editingProduct.id);
+
+      if (productError) throw productError;
+
+      // Update variants - delete old ones and insert new ones
+      await supabase.from('product_variants').delete().eq('product_id', editingProduct.id);
+      
+      const variantInserts = variants.map(v => ({
+        product_id: editingProduct.id,
+        quantity: v.quantity,
+        price: v.price,
+        is_default: v.isDefault,
+        stock_quantity: v.stockQuantity,
+      }));
+
+      const { error: variantError } = await supabase
+        .from('product_variants')
+        .insert(variantInserts);
+
+      if (variantError) throw variantError;
+
+      // Upload new images if any
+      for (let i = 0; i < productImages.length; i++) {
+        const file = productImages[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${editingProduct.id}/${Date.now()}-${i}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+
+        await supabase.from('product_images').insert({
+          product_id: editingProduct.id,
+          image_url: urlData.publicUrl,
+          is_primary: editingProduct.images.length === 0 && i === 0,
+          display_order: editingProduct.images.length + i,
+        });
+      }
+
+      toast({
+        title: "Product Updated!",
+        description: "Your product has been updated successfully",
+      });
+
+      // Reset form
+      resetForm();
+
+      // Refresh products list
+      fetchProducts();
+
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update product. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -713,7 +847,7 @@ const SellerDashboard: React.FC = () => {
         </section>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" />
               <span className="hidden sm:inline">Orders</span>
@@ -725,6 +859,10 @@ const SellerDashboard: React.FC = () => {
             <TabsTrigger value="add" className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add New</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Reports</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
@@ -815,6 +953,14 @@ const SellerDashboard: React.FC = () => {
                                     ))}
                                   </SelectContent>
                                 </Select>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => shareOrderBill(order)}
+                                  title="Share Bill"
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -836,6 +982,25 @@ const SellerDashboard: React.FC = () => {
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
+                              </div>
+                              {/* Hidden Bill Image for this order */}
+                              <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                                <OrderBillImage
+                                  ref={(el) => { billRefs.current[order.id] = el; }}
+                                  orderId={order.id}
+                                  customerName={order.customer_name}
+                                  customerPhone={order.customer_phone}
+                                  customerAddress={order.customer_address}
+                                  deliveryType={order.delivery_type}
+                                  paymentMethod={order.payment_method}
+                                  paymentStatus={order.payment_status}
+                                  orderStatus={order.order_status}
+                                  items={order.items}
+                                  subtotal={order.subtotal}
+                                  shippingCost={order.shipping_cost}
+                                  total={order.total}
+                                  createdAt={order.created_at}
+                                />
                               </div>
                             </TableCell>
                           </TableRow>
@@ -886,7 +1051,7 @@ const SellerDashboard: React.FC = () => {
                             </div>
                             <div className="flex gap-2">
                               {product.is_on_sale && (
-                                <Badge variant="secondary" className="bg-red-500 text-white">
+                                <Badge variant="destructive">
                                   <Percent className="w-3 h-3 mr-1" />
                                   ₹{product.discount_amount} OFF
                                 </Badge>
@@ -963,6 +1128,37 @@ const SellerDashboard: React.FC = () => {
                               </div>
                             )}
 
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingProduct(product);
+                                setActiveTab('add');
+                                // Pre-fill form with product data
+                                setProductName(product.name);
+                                setProductDescription(product.description || '');
+                                setProductCategory(product.category);
+                                setBasePrice(product.base_price.toString());
+                                setMeasurementUnit(product.measurement_unit);
+                                setPackingType(product.packing_type || 'pouch');
+                                setIsOnSale(product.is_on_sale);
+                                setDiscountAmount(product.discount_amount.toString());
+                                setDiscountType((product.discount_type as 'amount' | 'percentage') || 'amount');
+                                setIsLimitedSale(!!product.sale_end_time);
+                                setSaleEndTime(product.sale_end_time ? new Date(product.sale_end_time).toISOString().slice(0, 16) : '');
+                                setVariants(product.variants.map(v => ({
+                                  id: v.id,
+                                  quantity: v.quantity,
+                                  price: v.price,
+                                  isDefault: v.is_default || false,
+                                  stockQuantity: v.stock_quantity,
+                                })));
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="sm">
@@ -1002,11 +1198,16 @@ const SellerDashboard: React.FC = () => {
           {/* Add Product Tab */}
           <TabsContent value="add" className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Add New Product
+                  {editingProduct ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                  {editingProduct ? 'Edit Product' : 'Add New Product'}
                 </CardTitle>
+                {editingProduct && (
+                  <Button variant="outline" size="sm" onClick={resetForm}>
+                    Cancel Edit
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Basic Info */}
@@ -1017,7 +1218,7 @@ const SellerDashboard: React.FC = () => {
                       id="name"
                       value={productName}
                       onChange={(e) => setProductName(e.target.value)}
-                      placeholder="Enter product name"
+                      placeholder="e.g. Organic Turmeric Powder"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1239,14 +1440,21 @@ const SellerDashboard: React.FC = () => {
                 </div>
 
                 <Button
-                  onClick={handleAddProduct}
+                  onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
                   disabled={uploading}
                   className="w-full gradient-hero text-primary-foreground"
                 >
-                  {uploading ? 'Adding Product...' : 'Create Product'}
+                  {uploading 
+                    ? (editingProduct ? 'Updating Product...' : 'Adding Product...') 
+                    : (editingProduct ? 'Update Product' : 'Create Product')}
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Sales Reports Tab */}
+          <TabsContent value="reports" className="space-y-4">
+            <SalesReportDashboard />
           </TabsContent>
 
           {/* Settings Tab */}
@@ -1265,7 +1473,7 @@ const SellerDashboard: React.FC = () => {
                     <Input
                       value={newCategory}
                       onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder="New category name"
+                      placeholder="e.g. Spices, Snacks"
                     />
                     <Button onClick={addCategory} disabled={!newCategory.trim()}>
                       Add
@@ -1300,7 +1508,7 @@ const SellerDashboard: React.FC = () => {
                     <Input
                       value={newPackingType}
                       onChange={(e) => setNewPackingType(e.target.value)}
-                      placeholder="New packing type"
+                      placeholder="e.g. pouch, box, jar"
                     />
                     <Button onClick={addPackingType} disabled={!newPackingType.trim()}>
                       Add

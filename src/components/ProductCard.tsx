@@ -4,6 +4,7 @@ import { Product } from '@/types/product';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Percent } from 'lucide-react';
+import SaleCountdownTimer from './SaleCountdownTimer';
 
 interface ProductCardProps {
   product: Product;
@@ -31,6 +32,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   };
   const finalPrice = calculateFinalPrice();
 
+  // Check if it's a limited time sale
+  const hasLimitedSale = product.isOnSale && product.saleEndTime;
+
   return (
     <Card 
       className="group overflow-hidden border-0 shadow-soft hover:shadow-elevated transition-all duration-300 animate-fade-in cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
@@ -44,10 +48,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         />
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
-            <Badge className="bg-red-500 text-white text-xs shadow-lg">
+            <Badge className="bg-destructive text-destructive-foreground text-xs shadow-lg">
               <Percent className="w-3 h-3 mr-1" />
               {product.discountType === 'percentage' ? `${product.discountAmount}%` : `₹${product.discountAmount}`} OFF
             </Badge>
+          )}
+          {hasLimitedSale && (
+            <SaleCountdownTimer endTime={product.saleEndTime!} compact />
           )}
           {product.isInStock === false && (
             <Badge variant="destructive" className="text-xs">
