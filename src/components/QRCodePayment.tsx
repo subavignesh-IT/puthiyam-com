@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Smartphone, QrCode, Copy, Check, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, QrCode, Copy, Check, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,12 @@ import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import UPIAppSelector from './UPIAppSelector';
 
 interface QRCodePaymentProps {
   total: number;
@@ -26,7 +25,8 @@ interface QRCodePaymentProps {
 const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete, onBack, onTimeout }) => {
   const upiId = 'kathaiahkarthik@okhdfcbank';
   const merchantName = 'PUTHIYAM PRODUCTS';
-  const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${total}&cu=INR`;
+  const bankName = 'TMB Bank';
+  const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${total}&cu=INR&tn=${encodeURIComponent(`Payment for order - ₹${total}`)}`;
   
   const [timeRemaining, setTimeRemaining] = useState(600); // 10 minutes in seconds
   const [copied, setCopied] = useState(false);
@@ -39,12 +39,13 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
   // Generate QR code using QR Server API
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
 
-  // Timer countdown
+  // Timer countdown - Auto cancel on timeout
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
           clearInterval(timer);
+          // Auto cancel - no confirmation needed
           onTimeout();
           return 0;
         }
@@ -86,18 +87,16 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleOpenUpiApp = useCallback(() => {
+  const handleAppOpened = useCallback(() => {
     setUpiAppOpened(true);
-    // Try to open UPI deep link
-    window.location.href = upiUrl;
-  }, [upiUrl]);
+  }, []);
 
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(upiId);
     setCopied(true);
     toast({
       title: "UPI ID Copied!",
-      description: "Paste this in your UPI app to pay",
+      description: `Paste this in your UPI app to pay ₹${total}`,
     });
     setTimeout(() => setCopied(false), 3000);
   };
@@ -129,15 +128,6 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
     onPaymentComplete();
   };
 
-  const handlePaymentNotCompleted = () => {
-    setShowConfirmDialog(false);
-    toast({
-      title: "Payment Not Completed",
-      description: "Please complete the payment in your UPI app and try again.",
-      variant: "destructive"
-    });
-  };
-
   return (
     <>
       <Card className="animate-fade-in">
@@ -149,9 +139,9 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
           <CardTitle className="font-serif text-center">Complete Payment</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Timer */}
+          {/* Timer - Highlighted when low */}
           <div className={`flex items-center justify-center gap-2 p-3 rounded-lg ${
-            timeRemaining < 120 ? 'bg-destructive/10 text-destructive' : 'bg-muted'
+            timeRemaining < 120 ? 'bg-destructive text-destructive-foreground animate-pulse' : 'bg-muted'
           }`}>
             <Clock className="w-5 h-5" />
             <span className="font-medium">Time remaining: {formatTime(timeRemaining)}</span>
@@ -160,7 +150,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
           {timeRemaining < 120 && (
             <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-destructive text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>Order will be cancelled if payment is not completed in time</span>
+              <span>Order will be auto-cancelled when timer expires</span>
             </div>
           )}
 
@@ -169,19 +159,12 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
             <p className="text-3xl font-bold text-primary">₹{total}</p>
           </div>
 
-          {/* Option 1: Open UPI App Directly */}
-          <div className="space-y-3">
-            <Button 
-              onClick={handleOpenUpiApp}
-              className="w-full gradient-hero text-primary-foreground py-6 text-lg"
-            >
-              <Smartphone className="w-5 h-5 mr-2" />
-              Pay with UPI App
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              Opens GPay, PhonePe, Paytm, or other UPI apps
-            </p>
-          </div>
+          {/* UPI App Selector */}
+          <UPIAppSelector 
+            upiUrl={upiUrl} 
+            amount={total} 
+            onAppOpened={handleAppOpened}
+          />
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -192,7 +175,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
             </div>
           </div>
 
-          {/* Option 2: QR Code */}
+          {/* QR Code */}
           <div className="flex flex-col items-center gap-4">
             <div className="bg-card p-4 rounded-lg shadow-soft border border-border">
               <img
@@ -211,7 +194,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
           <div className="bg-muted/50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">UPI ID</p>
+                <p className="text-sm text-muted-foreground">UPI ID ({bankName})</p>
                 <p className="font-mono font-medium">{upiId}</p>
               </div>
               <Button variant="outline" size="sm" onClick={handleCopyUpi}>
@@ -229,7 +212,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
             </div>
           </div>
 
-          {/* Option 3: Enter UPI Address for Collect Request */}
+          {/* Enter UPI Address for Collect Request */}
           <div className="space-y-3">
             <Label htmlFor="payerUpi">Your UPI Address</Label>
             <div className="flex gap-2">
@@ -237,7 +220,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
                 id="payerUpi"
                 value={payerUpi}
                 onChange={(e) => setPayerUpi(e.target.value)}
-                placeholder="yourname@upi"
+                placeholder="e.g. yourname@upi"
                 disabled={paymentRequested}
               />
               <Button 
@@ -249,7 +232,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              We'll send a payment request to your UPI app
+              We'll send a payment request for ₹{total} to your UPI app
             </p>
           </div>
 
@@ -259,7 +242,7 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
         </CardContent>
       </Card>
 
-      {/* Payment Confirmation Dialog */}
+      {/* Payment Confirmation Dialog - Only Yes button */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -268,17 +251,14 @@ const QRCodePayment: React.FC<QRCodePaymentProps> = ({ total, onPaymentComplete,
               Did you complete the payment?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              If you've successfully paid ₹{total} using your UPI app, click "Yes, Payment Done" to confirm your order.
+              If you've successfully paid ₹{total} using your UPI app, click below to confirm your order.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handlePaymentNotCompleted}>
-              No, Still Processing
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handlePaymentConfirmed} className="gradient-hero">
-              Yes, Payment Done
+          <div className="flex justify-center pt-4">
+            <AlertDialogAction onClick={handlePaymentConfirmed} className="gradient-hero px-8">
+              Yes, Payment Done ✓
             </AlertDialogAction>
-          </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </>

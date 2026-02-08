@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { format } from 'date-fns';
+import { getOrderIdForDisplay } from '@/utils/orderIdGenerator';
 
 interface OrderItem {
   id: string;
@@ -40,6 +41,8 @@ const OrderBillImage = forwardRef<HTMLDivElement, OrderBillImageProps>(({
   total,
   createdAt,
 }, ref) => {
+  const displayOrderId = getOrderIdForDisplay(orderId);
+
   return (
     <div
       ref={ref}
@@ -59,9 +62,17 @@ const OrderBillImage = forwardRef<HTMLDivElement, OrderBillImageProps>(({
         <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
           Quality Products • Delivered with Love
         </p>
-        <p style={{ fontSize: '10px', color: '#999', marginTop: '4px' }}>
-          Order ID: {orderId.slice(0, 8).toUpperCase()}
-        </p>
+        <div style={{ 
+          marginTop: '10px', 
+          padding: '6px 12px', 
+          backgroundColor: '#F3F4F6', 
+          borderRadius: '6px',
+          display: 'inline-block'
+        }}>
+          <p style={{ fontSize: '14px', color: '#333', margin: 0, fontWeight: 'bold' }}>
+            Order ID: {displayOrderId}
+          </p>
+        </div>
       </div>
 
       {/* Order Date & Status */}

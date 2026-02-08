@@ -50,8 +50,11 @@ const SaleCountdownTimer: React.FC<SaleCountdownTimerProps> = ({ endTime, compac
 
   if (compact) {
     return (
-      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 animate-pulse-soft text-[10px] px-1.5 py-0.5">
-        <Clock className="w-2.5 h-2.5 mr-0.5" />
+      <Badge 
+        variant="outline" 
+        className="bg-gradient-to-r from-destructive to-orange-500 text-white border-0 shadow-lg text-[10px] px-2 py-1 font-bold animate-pulse"
+      >
+        <Clock className="w-3 h-3 mr-1" />
         {timeLeft.days > 0 
           ? `${timeLeft.days}d ${timeLeft.hours}h` 
           : timeLeft.hours > 0 

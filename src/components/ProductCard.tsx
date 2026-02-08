@@ -44,7 +44,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <img
           src={product.image}
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
@@ -52,9 +52,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               <Percent className="w-3 h-3 mr-1" />
               {product.discountType === 'percentage' ? `${product.discountAmount}%` : `₹${product.discountAmount}`} OFF
             </Badge>
-          )}
-          {hasLimitedSale && (
-            <SaleCountdownTimer endTime={product.saleEndTime!} compact />
           )}
           {product.isInStock === false && (
             <Badge variant="destructive" className="text-xs">
@@ -67,6 +64,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             {product.category}
           </span>
         </div>
+        {/* Limited sale timer - bottom right, highlighted */}
+        {hasLimitedSale && (
+          <div className="absolute bottom-2 right-2 animate-pulse">
+            <SaleCountdownTimer endTime={product.saleEndTime!} compact />
+          </div>
+        )}
         {/* Glow effect on hover */}
         <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       </div>

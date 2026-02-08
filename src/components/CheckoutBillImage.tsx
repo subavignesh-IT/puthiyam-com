@@ -1,7 +1,9 @@
 import React, { forwardRef } from 'react';
 import { CartItem } from '@/types/product';
+import { getOrderIdForDisplay } from '@/utils/orderIdGenerator';
 
 interface CheckoutBillImageProps {
+  orderId?: string;
   customerName: string;
   customerPhone: string;
   customerAddress: string | null;
@@ -15,7 +17,7 @@ interface CheckoutBillImageProps {
 }
 
 const CheckoutBillImage = forwardRef<HTMLDivElement, CheckoutBillImageProps>(
-  ({ customerName, customerPhone, customerAddress, deliveryType, paymentMethod, paymentStatus, items, subtotal, shippingCost, total }, ref) => {
+  ({ orderId, customerName, customerPhone, customerAddress, deliveryType, paymentMethod, paymentStatus, items, subtotal, shippingCost, total }, ref) => {
     const orderDate = new Date().toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'long',
@@ -23,6 +25,8 @@ const CheckoutBillImage = forwardRef<HTMLDivElement, CheckoutBillImageProps>(
       hour: '2-digit',
       minute: '2-digit'
     });
+
+    const displayOrderId = orderId ? getOrderIdForDisplay(orderId) : `#${Date.now().toString().slice(-6)}`;
 
     return (
       <div
@@ -54,6 +58,17 @@ const CheckoutBillImage = forwardRef<HTMLDivElement, CheckoutBillImageProps>(
             PUTHIYAM PRODUCTS
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#666' }}>Quality Products, Trusted Service</p>
+          <div style={{ 
+            marginTop: '12px', 
+            padding: '8px', 
+            backgroundColor: '#FFF8DC', 
+            borderRadius: '6px',
+            display: 'inline-block'
+          }}>
+            <p style={{ margin: '0', fontSize: '14px', fontWeight: 'bold', color: '#8B4513' }}>
+              Order ID: {displayOrderId}
+            </p>
+          </div>
           <p style={{ margin: '8px 0 0', fontSize: '10px', color: '#888' }}>{orderDate}</p>
         </div>
 
@@ -89,16 +104,24 @@ const CheckoutBillImage = forwardRef<HTMLDivElement, CheckoutBillImageProps>(
               </tr>
             </thead>
             <tbody>
-              {items.map((item, index) => (
-                <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '6px 4px', color: '#333' }}>{item.name}</td>
-                  <td style={{ textAlign: 'center', padding: '6px 4px', color: '#333' }}>{item.quantity}</td>
-                  <td style={{ textAlign: 'right', padding: '6px 4px', color: '#333' }}>₹{item.price}</td>
-                  <td style={{ textAlign: 'right', padding: '6px 4px', color: '#333', fontWeight: 'bold' }}>
-                    ₹{item.price * item.quantity}
-                  </td>
-                </tr>
-              ))}
+              {items.map((item, index) => {
+                const itemPrice = item.selectedVariant?.price || item.price;
+                return (
+                  <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '6px 4px', color: '#333' }}>
+                      {item.name}
+                      {item.selectedVariant && (
+                        <span style={{ fontSize: '9px', color: '#666' }}> ({item.selectedVariant.weight})</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', color: '#333' }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'right', padding: '6px 4px', color: '#333' }}>₹{itemPrice}</td>
+                    <td style={{ textAlign: 'right', padding: '6px 4px', color: '#333', fontWeight: 'bold' }}>
+                      ₹{itemPrice * item.quantity}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -154,6 +177,9 @@ const CheckoutBillImage = forwardRef<HTMLDivElement, CheckoutBillImageProps>(
         {/* Footer */}
         <div style={{ textAlign: 'center', fontSize: '10px', color: '#888' }}>
           <p style={{ margin: '0' }}>📞 Contact: 9361284773</p>
+          <p style={{ margin: '4px 0', fontWeight: 'bold', color: '#8B4513' }}>
+            UPI: kathaiahkarthik@okhdfcbank (TMB Bank)
+          </p>
           <p style={{ margin: '4px 0 0' }}>Thank you for shopping with us!</p>
         </div>
       </div>

@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Download, TrendingUp, IndianRupee, ShoppingCart, Package, Calendar } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { Download, TrendingUp, IndianRupee, ShoppingCart, Package, Calendar, Users } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 interface Order {
   id: string;
+  customer_name: string;
+  customer_phone: string;
   total: number;
   subtotal: number;
   shipping_cost: number;
@@ -24,6 +26,14 @@ interface DailySales {
   date: string;
   sales: number;
   orders: number;
+}
+
+interface CustomerSummary {
+  name: string;
+  phone: string;
+  orderCount: number;
+  totalSpent: number;
+  lastOrder: string;
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', '#22c55e', '#f59e0b', '#ef4444'];
@@ -67,8 +77,9 @@ const SalesReportDashboard: React.FC = () => {
     const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
     const paidOrders = orders.filter(o => o.payment_status === 'paid');
     const paidRevenue = paidOrders.reduce((sum, o) => sum + o.total, 0);
+    const uniqueCustomers = new Set(orders.map(o => o.customer_phone)).size;
 
-    return { totalRevenue, totalOrders, completedOrders, pendingOrders, avgOrderValue, paidRevenue };
+    return { totalRevenue, totalOrders, completedOrders, pendingOrders, avgOrderValue, paidRevenue, uniqueCustomers };
   }, [orders]);
 
   const dailySalesData = useMemo(() => {
@@ -118,7 +129,43 @@ const SalesReportDashboard: React.FC = () => {
       .slice(0, 5);
   }, [orders]);
 
+  // Customer-wise summary
+  const customerSummary = useMemo(() => {
+    const customers: Record<string, CustomerSummary> = {};
+    
+    orders.forEach(order => {
+      const key = order.customer_phone;
+      if (!customers[key]) {
+        customers[key] = {
+          name: order.customer_name,
+          phone: order.customer_phone,
+          orderCount: 0,
+          totalSpent: 0,
+          lastOrder: order.created_at,
+        };
+      }
+      customers[key].orderCount += 1;
+      customers[key].totalSpent += order.total;
+      if (new Date(order.created_at) > new Date(customers[key].lastOrder)) {
+        customers[key].lastOrder = order.created_at;
+      }
+    });
+
+    return Object.values(customers).sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [orders]);
+
   const downloadExcel = () => {
+    // Summary sheet
+    const summarySheet = [
+      { 'Metric': 'Total Revenue', 'Value': `₹${stats.totalRevenue}` },
+      { 'Metric': 'Paid Revenue', 'Value': `₹${stats.paidRevenue}` },
+      { 'Metric': 'Total Orders', 'Value': stats.totalOrders },
+      { 'Metric': 'Completed Orders', 'Value': stats.completedOrders },
+      { 'Metric': 'Pending Orders', 'Value': stats.pendingOrders },
+      { 'Metric': 'Average Order Value', 'Value': `₹${stats.avgOrderValue}` },
+      { 'Metric': 'Unique Customers', 'Value': stats.uniqueCustomers },
+    ];
+
     // Daily sales sheet
     const dailySheet = dailySalesData.map(d => ({
       'Date': d.date,
@@ -126,10 +173,21 @@ const SalesReportDashboard: React.FC = () => {
       'Number of Orders': d.orders,
     }));
 
+    // Customer-wise report sheet
+    const customerSheet = customerSummary.map(c => ({
+      'Customer Name': c.name,
+      'Phone': c.phone,
+      'Total Orders': c.orderCount,
+      'Total Spent (₹)': c.totalSpent,
+      'Last Order Date': format(new Date(c.lastOrder), 'yyyy-MM-dd HH:mm'),
+    }));
+
     // Orders detail sheet
     const ordersSheet = orders.map(o => ({
       'Order ID': o.id.slice(0, 8),
       'Date': format(new Date(o.created_at), 'yyyy-MM-dd HH:mm'),
+      'Customer Name': o.customer_name,
+      'Customer Phone': o.customer_phone,
       'Subtotal (₹)': o.subtotal,
       'Shipping (₹)': o.shipping_cost,
       'Total (₹)': o.total,
@@ -139,20 +197,30 @@ const SalesReportDashboard: React.FC = () => {
       'Items': o.items.map(i => `${i.name} x${i.quantity}`).join(', '),
     }));
 
-    // Summary sheet
-    const summarySheet = [
-      { 'Metric': 'Total Revenue', 'Value': `₹${stats.totalRevenue}` },
-      { 'Metric': 'Paid Revenue', 'Value': `₹${stats.paidRevenue}` },
-      { 'Metric': 'Total Orders', 'Value': stats.totalOrders },
-      { 'Metric': 'Completed Orders', 'Value': stats.completedOrders },
-      { 'Metric': 'Pending Orders', 'Value': stats.pendingOrders },
-      { 'Metric': 'Average Order Value', 'Value': `₹${stats.avgOrderValue}` },
-    ];
+    // Product-wise summary
+    const productSheet = Object.entries(
+      orders.reduce((acc, order) => {
+        order.items.forEach(item => {
+          if (!acc[item.name]) {
+            acc[item.name] = { quantity: 0, revenue: 0 };
+          }
+          acc[item.name].quantity += item.quantity;
+          acc[item.name].revenue += item.price * item.quantity;
+        });
+        return acc;
+      }, {} as Record<string, { quantity: number; revenue: number }>)
+    ).map(([name, data]) => ({
+      'Product Name': name,
+      'Quantity Sold': data.quantity,
+      'Revenue (₹)': data.revenue,
+    })).sort((a, b) => b['Revenue (₹)'] - a['Revenue (₹)']);
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summarySheet), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailySheet), 'Daily Sales');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ordersSheet), 'Orders');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(customerSheet), 'Customer Report');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ordersSheet), 'All Orders');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productSheet), 'Product Summary');
 
     XLSX.writeFile(wb, `PUTHIYAM_Sales_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
@@ -199,7 +267,7 @@ const SalesReportDashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -217,7 +285,7 @@ const SalesReportDashboard: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-secondary/10 rounded-lg">
-                <ShoppingCart className="w-5 h-5 text-secondary" />
+                <ShoppingCart className="w-5 h-5 text-secondary-foreground" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Orders</p>
@@ -235,6 +303,19 @@ const SalesReportDashboard: React.FC = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Avg. Order Value</p>
                 <p className="text-lg font-bold">₹{stats.avgOrderValue}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Users className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Customers</p>
+                <p className="text-lg font-bold">{stats.uniqueCustomers}</p>
               </div>
             </div>
           </CardContent>
@@ -312,9 +393,9 @@ const SalesReportDashboard: React.FC = () => {
                   <Line 
                     type="monotone" 
                     dataKey="orders" 
-                    stroke="hsl(var(--secondary))" 
+                    stroke="hsl(var(--primary))" 
                     strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--secondary))' }}
+                    dot={{ fill: 'hsl(var(--primary))' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -360,35 +441,67 @@ const SalesReportDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Top Products */}
+        {/* Top Customers */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Top Selling Products</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Top Customers
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {topProducts.length > 0 ? (
+            {customerSummary.length > 0 ? (
               <div className="space-y-3">
-                {topProducts.map((product, index) => (
+                {customerSummary.slice(0, 5).map((customer, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0">
                         {index + 1}
                       </Badge>
                       <div>
-                        <p className="text-sm font-medium line-clamp-1">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">{product.quantity} sold</p>
+                        <p className="text-sm font-medium line-clamp-1">{customer.name}</p>
+                        <p className="text-xs text-muted-foreground">{customer.orderCount} orders</p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-primary">₹{product.revenue}</span>
+                    <span className="text-sm font-semibold text-primary">₹{customer.totalSpent}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground py-8 text-sm">No sales data yet</p>
+              <p className="text-center text-muted-foreground py-8 text-sm">No customer data yet</p>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Top Products */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Top Selling Products</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topProducts.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+              {topProducts.map((product, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0">
+                      {index + 1}
+                    </Badge>
+                    <div>
+                      <p className="text-sm font-medium line-clamp-1">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{product.quantity} sold</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold text-primary">₹{product.revenue}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8 text-sm">No sales data yet</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

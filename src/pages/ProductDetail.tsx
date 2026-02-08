@@ -8,6 +8,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
 import ImageSlideshow from '@/components/ImageSlideshow';
+import SaleCountdownTimer from '@/components/SaleCountdownTimer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -333,13 +334,13 @@ const ProductDetail: React.FC = () => {
           {/* Image Gallery */}
           <div className="space-y-4">
             <div 
-              className="aspect-square overflow-hidden rounded-2xl bg-muted cursor-pointer group relative"
+              className="aspect-square overflow-hidden rounded-2xl bg-white cursor-pointer group relative"
               onClick={() => setSlideshowOpen(true)}
             >
               <img
                 src={productImages[selectedImage]}
                 alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
               />
               {/* Sale/Stock badges */}
               <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -352,6 +353,12 @@ const ProductDetail: React.FC = () => {
                   <Badge variant="destructive">Out of Stock</Badge>
                 )}
               </div>
+              {/* Sale countdown timer - bottom right */}
+              {product.isOnSale && product.saleEndTime && (
+                <div className="absolute bottom-4 right-4">
+                  <SaleCountdownTimer endTime={product.saleEndTime} />
+                </div>
+              )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
                 <span className="bg-white/90 text-foreground px-4 py-2 rounded-full text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-lg">
                   Tap to view

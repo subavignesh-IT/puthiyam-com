@@ -11,9 +11,19 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Phone, CreditCard, Banknote } from 'lucide-react';
+import { Phone, CreditCard, Banknote, Share2, Download, MessageCircle } from 'lucide-react';
 import QRCodePayment from './QRCodePayment';
 import CheckoutBillImage from './CheckoutBillImage';
+import { generateOrderId, getOrderIdForDisplay } from '@/utils/orderIdGenerator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const CheckoutForm: React.FC = () => {
   const { items, getTotal, getShippingCost, clearCart } = useCart();
@@ -28,7 +38,10 @@ const CheckoutForm: React.FC = () => {
   });
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [generatedOrderId, setGeneratedOrderId] = useState('');
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const billRef = useRef<HTMLDivElement>(null);
+  const [billImageUrl, setBillImageUrl] = useState<string | null>(null);
 
   // Load customer defaults when available
   useEffect(() => {
@@ -52,10 +65,28 @@ const CheckoutForm: React.FC = () => {
     }));
   };
 
+  const getTodayOrderCount = async (): Promise<number> => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const { count, error } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', today.toISOString());
+
+    if (error) return 0;
+    return count || 0;
+  };
+
   const saveOrderToDatabase = async (isPaid: boolean) => {
-    if (!user) return;
+    if (!user) return null;
 
     try {
+      // Get today's order count for order ID generation
+      const todayOrderCount = await getTodayOrderCount();
+      const orderId = generateOrderId(todayOrderCount);
+      setGeneratedOrderId(orderId);
+
       const orderData = {
         user_id: user.id,
         customer_name: formData.name,
@@ -81,14 +112,16 @@ const CheckoutForm: React.FC = () => {
       const { error } = await supabase.from('orders').insert([orderData]);
       if (error) {
         console.error('Error saving order:', error);
+        return null;
       }
+      return orderId;
     } catch (error) {
       console.error('Error saving order:', error);
+      return null;
     }
   };
 
-  const generateAndShareBill = async (isPaid: boolean) => {
-    // Wait for state updates and render
+  const generateBillImage = async (): Promise<string | null> => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     if (billRef.current) {
@@ -97,20 +130,34 @@ const CheckoutForm: React.FC = () => {
           backgroundColor: '#ffffff',
           scale: 2,
         });
-        
-        // Download the image
-        const link = document.createElement('a');
-        link.download = `PUTHIYAM_Bill_${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-
-        // Open WhatsApp with a summary
-        const message = `🛒 *New Order from PUTHIYAM PRODUCTS*\n\n👤 Customer: ${formData.name}\n📞 Phone: ${formData.phone}\n💰 Total: ₹${grandTotal}\n${isPaid ? '✅ PAID' : '⏳ COD - PENDING'}\n\n📎 Bill image attached`;
-        const encodedMessage = encodeURIComponent(message);
-        window.open(`https://wa.me/919361284773?text=${encodedMessage}`, '_blank');
+        return canvas.toDataURL('image/png');
       } catch (error) {
         console.error('Error generating bill image:', error);
       }
+    }
+    return null;
+  };
+
+  const downloadBill = async () => {
+    const imageUrl = billImageUrl || await generateBillImage();
+    if (imageUrl) {
+      const link = document.createElement('a');
+      link.download = `PUTHIYAM_Bill_${generatedOrderId || Date.now()}.png`;
+      link.href = imageUrl;
+      link.click();
+    }
+  };
+
+  const shareToWhatsApp = (toSeller: boolean = true) => {
+    const phoneNumber = toSeller ? '919361284773' : '';
+    const message = `🛒 *Order from PUTHIYAM PRODUCTS*\n\n📋 Order ID: ${generatedOrderId}\n👤 Customer: ${formData.name}\n📞 Phone: ${formData.phone}\n💰 Total: ₹${grandTotal}\n${paymentMethod === 'online' ? '✅ PAID' : '⏳ COD - PENDING'}\n\n📎 Bill image downloaded - please share it!`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    if (toSeller) {
+      window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+    } else {
+      // For customer share, open WhatsApp with just the message (they choose recipient)
+      window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
     }
   };
 
@@ -128,19 +175,28 @@ const CheckoutForm: React.FC = () => {
       address: formData.address,
     });
 
-    // Generate bill image and share
-    await generateAndShareBill(true);
+    // Generate bill image
+    const imageUrl = await generateBillImage();
+    setBillImageUrl(imageUrl);
 
-    // Show thank you toast with SMS info
-    const smsContent = `Thank you for your order! Total: ₹${grandTotal}. Your order has been confirmed. - PUTHIYAM PRODUCTS`;
+    // Download bill automatically
+    if (imageUrl) {
+      const link = document.createElement('a');
+      link.download = `PUTHIYAM_Bill_${generatedOrderId}.png`;
+      link.href = imageUrl;
+      link.click();
+    }
+
+    // Share to seller's WhatsApp
+    shareToWhatsApp(true);
+
+    // Show share dialog for customer
+    setShowShareDialog(true);
+
+    // Show thank you toast
     toast({
       title: "🎉 Thank You!",
-      description: (
-        <div>
-          <p>Your order has been placed successfully.</p>
-          <p className="text-xs mt-2 text-muted-foreground">SMS: {smsContent}</p>
-        </div>
-      ),
+      description: "Your order has been placed successfully.",
       duration: 8000,
     });
 
@@ -161,19 +217,28 @@ const CheckoutForm: React.FC = () => {
       address: formData.address,
     });
 
-    // Generate bill image and share
-    await generateAndShareBill(false);
+    // Generate bill image
+    const imageUrl = await generateBillImage();
+    setBillImageUrl(imageUrl);
 
-    // Show thank you toast with SMS info
-    const smsContent = `Thank you for your order! Total: ₹${grandTotal} (COD). Pay when you receive. - PUTHIYAM PRODUCTS`;
+    // Download bill automatically
+    if (imageUrl) {
+      const link = document.createElement('a');
+      link.download = `PUTHIYAM_Bill_${generatedOrderId}.png`;
+      link.href = imageUrl;
+      link.click();
+    }
+
+    // Share to seller's WhatsApp
+    shareToWhatsApp(true);
+
+    // Show share dialog for customer
+    setShowShareDialog(true);
+
+    // Show thank you toast
     toast({
       title: "🎉 Order Placed!",
-      description: (
-        <div>
-          <p>Your COD order has been placed. Pay when you receive the order.</p>
-          <p className="text-xs mt-2 text-muted-foreground">SMS: {smsContent}</p>
-        </div>
-      ),
+      description: "Your COD order has been placed. Pay when you receive the order.",
       duration: 8000,
     });
 
@@ -231,20 +296,60 @@ const CheckoutForm: React.FC = () => {
 
   if (paymentComplete) {
     return (
-      <Card className="text-center py-12 animate-fade-in">
-        <CardContent className="space-y-4">
-          <div className="w-20 h-20 mx-auto bg-secondary/20 rounded-full flex items-center justify-center">
-            <span className="text-4xl">🎉</span>
-          </div>
-          <h2 className="font-serif text-2xl font-bold text-foreground">Thank You!</h2>
-          <p className="text-muted-foreground">
-            Your order has been placed successfully. Check your WhatsApp for order confirmation.
-          </p>
-          <Button onClick={() => window.location.href = '/'} className="gradient-hero text-primary-foreground">
-            Continue Shopping
-          </Button>
-        </CardContent>
-      </Card>
+      <>
+        <Card className="text-center py-12 animate-fade-in">
+          <CardContent className="space-y-4">
+            <div className="w-20 h-20 mx-auto bg-secondary/20 rounded-full flex items-center justify-center">
+              <span className="text-4xl">🎉</span>
+            </div>
+            <h2 className="font-serif text-2xl font-bold text-foreground">Thank You!</h2>
+            <p className="text-muted-foreground">
+              Order ID: <strong>{generatedOrderId}</strong>
+            </p>
+            <p className="text-muted-foreground">
+              Your bill has been downloaded. Share it via WhatsApp if needed.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button onClick={downloadBill} variant="outline" className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Download Bill Again
+              </Button>
+              <Button onClick={() => shareToWhatsApp(false)} variant="outline" className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" />
+                Share Bill
+              </Button>
+            </div>
+            <Button onClick={() => window.location.href = '/'} className="gradient-hero text-primary-foreground">
+              Continue Shopping
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Share Dialog */}
+        <AlertDialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <Share2 className="w-5 h-5" />
+                Share Your Bill
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Your bill image has been downloaded. Would you like to share it?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+              <Button onClick={() => { downloadBill(); setShowShareDialog(false); }} variant="outline" className="w-full sm:w-auto">
+                <Download className="w-4 h-4 mr-2" />
+                Just Download
+              </Button>
+              <AlertDialogAction onClick={() => { shareToWhatsApp(false); setShowShareDialog(false); }} className="gradient-hero w-full sm:w-auto">
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Share on WhatsApp
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 
@@ -275,6 +380,7 @@ const CheckoutForm: React.FC = () => {
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
         <CheckoutBillImage
           ref={billRef}
+          orderId={generatedOrderId}
           customerName={formData.name}
           customerPhone={formData.phone}
           customerAddress={deliveryType === 'shipping' ? formData.address : null}
@@ -387,7 +493,7 @@ const CheckoutForm: React.FC = () => {
                     <CreditCard className="w-4 h-4" />
                     Online Payment (UPI)
                   </span>
-                  <span className="block text-sm text-muted-foreground">Pay now via UPI QR code</span>
+                  <span className="block text-sm text-muted-foreground">Pay now via GPay, PhonePe, Paytm, etc.</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:border-primary transition-colors">

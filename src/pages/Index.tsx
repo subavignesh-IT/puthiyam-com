@@ -6,17 +6,20 @@ import ProductCard from '@/components/ProductCard';
 import CategoryFilter from '@/components/CategoryFilter';
 import BottomNav from '@/components/BottomNav';
 import { Product } from '@/types/product';
+import { subDays } from 'date-fns';
 
 const Index: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
+  const [productSalesCount, setProductSalesCount] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<string[]>(['All']);
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    fetchProductSalesCount();
   }, []);
 
   const fetchCategories = async () => {
@@ -27,6 +30,31 @@ const Index: React.FC = () => {
 
     if (!error && data) {
       setCategories(['All', ...data.map(c => c.name)]);
+    }
+  };
+
+  // Fetch sales count for each product from orders (last 30 days)
+  const fetchProductSalesCount = async () => {
+    try {
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      const { data: ordersData, error } = await supabase
+        .from('orders')
+        .select('items')
+        .gte('created_at', thirtyDaysAgo.toISOString());
+
+      if (error) throw error;
+
+      const salesCount: Record<string, number> = {};
+      (ordersData || []).forEach((order: { items: unknown }) => {
+        const items = order.items as Array<{ id: string; quantity: number }>;
+        items.forEach(item => {
+          salesCount[item.id] = (salesCount[item.id] || 0) + item.quantity;
+        });
+      });
+
+      setProductSalesCount(salesCount);
+    } catch (error) {
+      console.error('Error fetching product sales count:', error);
     }
   };
 
@@ -74,9 +102,9 @@ const Index: React.FC = () => {
             })),
             isInStock: product.is_in_stock,
             isOnSale: isOnSale,
-            discountAmount: product.discount_amount,
+            discountAmount: isOnSale ? product.discount_amount : 0, // Reset discount if expired
             discountType: (product as any).discount_type || 'amount',
-            saleEndTime: saleEndTime,
+            saleEndTime: isOnSale ? saleEndTime : null, // Clear end time if expired
           };
         })
       );
@@ -89,13 +117,17 @@ const Index: React.FC = () => {
     }
   };
 
-  // Use only database products
-  const allProducts = useMemo(() => {
-    return dbProducts;
-  }, [dbProducts]);
+  // Sort products: least selling first to increase their visibility
+  const sortedProducts = useMemo(() => {
+    return [...dbProducts].sort((a, b) => {
+      const aSales = productSalesCount[a.id] || 0;
+      const bSales = productSalesCount[b.id] || 0;
+      return aSales - bSales; // Ascending: least selling first
+    });
+  }, [dbProducts, productSalesCount]);
 
   const filteredProducts = useMemo(() => {
-    return allProducts.filter(product => {
+    return sortedProducts.filter(product => {
       // Filter out products that are not in stock
       if (product.isInStock === false) return false;
       
@@ -104,7 +136,7 @@ const Index: React.FC = () => {
                            product.description.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery, allProducts]);
+  }, [selectedCategory, searchQuery, sortedProducts]);
 
   return (
     <div className="min-h-screen bg-background pb-20">
