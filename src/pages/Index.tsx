@@ -60,7 +60,7 @@ const Index: React.FC = () => {
 
   const fetchProducts = async () => {
     try {
-      // Fetch active products from database
+      // Fetch active products from database (including out of stock to show with label)
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
@@ -87,6 +87,9 @@ const Index: React.FC = () => {
           const isSaleExpired = saleEndTime && new Date(saleEndTime) < new Date();
           const isOnSale = product.is_on_sale && !isSaleExpired;
 
+          // Calculate total stock from all variants
+          const totalStock = variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
+
           return {
             id: product.id,
             name: product.name,
@@ -99,12 +102,14 @@ const Index: React.FC = () => {
             variants: variants.map(v => ({
               weight: `${v.quantity}${product.measurement_unit}`,
               price: v.price,
+              stockQuantity: v.stock_quantity,
             })),
             isInStock: product.is_in_stock,
             isOnSale: isOnSale,
-            discountAmount: isOnSale ? product.discount_amount : 0, // Reset discount if expired
+            discountAmount: isOnSale ? product.discount_amount : 0,
             discountType: (product as any).discount_type || 'amount',
-            saleEndTime: isOnSale ? saleEndTime : null, // Clear end time if expired
+            saleEndTime: isOnSale ? saleEndTime : null,
+            totalStock: totalStock,
           };
         })
       );
@@ -128,9 +133,7 @@ const Index: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     return sortedProducts.filter(product => {
-      // Filter out products that are not in stock
-      if (product.isInStock === false) return false;
-      
+      // Show all products including out of stock (they'll have a label)
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            product.description.toLowerCase().includes(searchQuery.toLowerCase());

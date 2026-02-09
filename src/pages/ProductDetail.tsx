@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Send, Star, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Send, Star, Upload, Trash2, Bell, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/context/CartContext';
@@ -14,8 +14,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Product, ProductVariant } from '@/types/product';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Review {
   id: string;
@@ -46,6 +54,15 @@ const ProductDetail: React.FC = () => {
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [saleExpired, setSaleExpired] = useState(false);
+  const [totalStock, setTotalStock] = useState(0);
+  
+  // Pre-book dialog state
+  const [preBookOpen, setPreBookOpen] = useState(false);
+  const [preBookName, setPreBookName] = useState('');
+  const [preBookPhone, setPreBookPhone] = useState('');
+  const [preBookAddress, setPreBookAddress] = useState('');
+  const [preBookSubmitting, setPreBookSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -90,6 +107,14 @@ const ProductDetail: React.FC = () => {
         const primaryImage = images.find(img => img.is_primary) || images[0];
         const defaultVariant = variants.find(v => v.is_default) || variants[0];
 
+        // Check if sale has expired
+        const saleEndTime = (dbProduct as any).sale_end_time;
+        const isSaleExpired = saleEndTime && new Date(saleEndTime) < new Date();
+        
+        // Calculate total stock
+        const stockTotal = variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
+        setTotalStock(stockTotal);
+
         const fetchedProduct: Product = {
           id: dbProduct.id,
           name: dbProduct.name,
@@ -102,12 +127,14 @@ const ProductDetail: React.FC = () => {
           variants: variants.map(v => ({
             weight: `${v.quantity}${dbProduct.measurement_unit}`,
             price: v.price,
+            stockQuantity: v.stock_quantity,
           })),
           isInStock: dbProduct.is_in_stock,
-          isOnSale: dbProduct.is_on_sale,
-          discountAmount: dbProduct.discount_amount,
+          isOnSale: dbProduct.is_on_sale && !isSaleExpired,
+          discountAmount: dbProduct.is_on_sale && !isSaleExpired ? dbProduct.discount_amount : 0,
           discountType: (dbProduct as any).discount_type || 'amount',
-          saleEndTime: (dbProduct as any).sale_end_time,
+          saleEndTime: dbProduct.is_on_sale && !isSaleExpired ? saleEndTime : null,
+          totalStock: stockTotal,
         };
 
         setProduct(fetchedProduct);
@@ -123,6 +150,18 @@ const ProductDetail: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const handleSaleExpired = useCallback(() => {
+    setSaleExpired(true);
+    if (product) {
+      setProduct({
+        ...product,
+        isOnSale: false,
+        discountAmount: 0,
+        saleEndTime: null,
+      });
+    }
+  }, [product]);
 
   const fetchReviews = async () => {
     const { data, error } = await supabase
@@ -261,6 +300,68 @@ const ProductDetail: React.FC = () => {
     addToCart(product, selectedVariant || undefined);
   };
 
+  const handlePreBook = async () => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please login to pre-book this product",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+
+    if (!preBookName.trim() || !preBookPhone.trim()) {
+      toast({
+        title: "Missing Details",
+        description: "Please enter your name and phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setPreBookSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('requested_products')
+        .insert({
+          user_id: user.id,
+          product_id: product?.id,
+          variant_quantity: selectedVariant ? parseFloat(selectedVariant.weight) : null,
+          variant_price: selectedVariant?.price || product?.price,
+          customer_name: preBookName,
+          customer_phone: preBookPhone,
+          customer_address: preBookAddress || null,
+          status: 'requested',
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "🎉 Pre-Booking Confirmed!",
+        description: "We'll notify you when this product is back in stock",
+      });
+
+      setPreBookOpen(false);
+      setPreBookName('');
+      setPreBookPhone('');
+      setPreBookAddress('');
+    } catch (error) {
+      console.error('Error pre-booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to pre-book product",
+        variant: "destructive"
+      });
+    } finally {
+      setPreBookSubmitting(false);
+    }
+  };
+
+  // Show limited stock warning for customers
+  const showLimitedStock = !isAdmin && totalStock > 0 && totalStock <= 5;
+
   const renderStars = (rating: number, interactive = false, onRate?: (r: number) => void) => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
@@ -356,7 +457,11 @@ const ProductDetail: React.FC = () => {
               {/* Sale countdown timer - bottom right */}
               {product.isOnSale && product.saleEndTime && (
                 <div className="absolute bottom-4 right-4">
-                  <SaleCountdownTimer endTime={product.saleEndTime} />
+                  <SaleCountdownTimer 
+                    endTime={product.saleEndTime} 
+                    productId={product.id}
+                    onExpired={handleSaleExpired}
+                  />
                 </div>
               )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
@@ -423,6 +528,14 @@ const ProductDetail: React.FC = () => {
               {reviews.length} customer {reviews.length === 1 ? 'review' : 'reviews'}
             </div>
 
+            {/* Limited stock warning for customers */}
+            {showLimitedStock && (
+              <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700">
+                <AlertTriangle className="w-5 h-5" />
+                <span className="font-medium">Limited Stock: Only {totalStock} left!</span>
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <span className="text-3xl font-bold text-primary animate-pulse-soft">
                 ₹{finalPrice}
@@ -432,14 +545,28 @@ const ProductDetail: React.FC = () => {
               )}
             </div>
 
-            <Button
-              onClick={handleAddToCart}
-              disabled={product.isInStock === false}
-              className="w-full gradient-hero text-primary-foreground text-lg py-6 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200 shadow-elevated disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              {product.isInStock === false ? 'Out of Stock' : 'Add to Cart'}
-            </Button>
+            {product.isInStock === false ? (
+              <div className="space-y-3">
+                <Button
+                  onClick={() => setPreBookOpen(true)}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white text-lg py-6 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200 shadow-elevated"
+                >
+                  <Bell className="w-5 h-5 mr-2" />
+                  Pre-Book This Product
+                </Button>
+                <p className="text-sm text-muted-foreground text-center">
+                  🔔 Get notified when this product is back in stock
+                </p>
+              </div>
+            ) : (
+              <Button
+                onClick={handleAddToCart}
+                className="w-full gradient-hero text-primary-foreground text-lg py-6 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200 shadow-elevated"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Add to Cart
+              </Button>
+            )}
           </div>
         </div>
 
@@ -581,6 +708,63 @@ const ProductDetail: React.FC = () => {
         isOpen={slideshowOpen}
         onClose={() => setSlideshowOpen(false)}
       />
+
+      {/* Pre-Book Dialog */}
+      <Dialog open={preBookOpen} onOpenChange={setPreBookOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-orange-500" />
+              Pre-Book: {product?.name}
+            </DialogTitle>
+            <DialogDescription>
+              This product is currently out of stock. Leave your details and we'll notify you when it's available.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="prebook-name">Your Name *</Label>
+              <Input
+                id="prebook-name"
+                value={preBookName}
+                onChange={(e) => setPreBookName(e.target.value)}
+                placeholder="e.g. John Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prebook-phone">Phone Number *</Label>
+              <Input
+                id="prebook-phone"
+                value={preBookPhone}
+                onChange={(e) => setPreBookPhone(e.target.value)}
+                placeholder="e.g. 9876543210"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prebook-address">Address (Optional)</Label>
+              <Textarea
+                id="prebook-address"
+                value={preBookAddress}
+                onChange={(e) => setPreBookAddress(e.target.value)}
+                placeholder="e.g. 123 Main Street, City"
+                rows={2}
+              />
+            </div>
+            {selectedVariant && (
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <span className="font-medium">Selected Variant:</span> {selectedVariant.weight} - ₹{selectedVariant.price}
+              </div>
+            )}
+            <Button
+              onClick={handlePreBook}
+              disabled={preBookSubmitting}
+              className="w-full bg-orange-500 hover:bg-orange-600"
+            >
+              {preBookSubmitting ? 'Submitting...' : '🔔 Confirm Pre-Booking'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

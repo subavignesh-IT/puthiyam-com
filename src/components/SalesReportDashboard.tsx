@@ -40,12 +40,60 @@ const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accen
 
 const SalesReportDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Array<{
+    id: string;
+    name: string;
+    category: string;
+    base_price: number;
+    is_in_stock: boolean;
+    is_on_sale: boolean;
+    discount_amount: number;
+    variants: Array<{ quantity: number; price: number; stock_quantity: number }>;
+    measurement_unit: string;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<'7' | '30' | '90'>('30');
 
   useEffect(() => {
     fetchOrders();
+    fetchProducts();
   }, [dateRange]);
+
+  const fetchProducts = async () => {
+    try {
+      const { data: productsData, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      const productsWithVariants = await Promise.all(
+        (productsData || []).map(async (product) => {
+          const { data: variants } = await supabase
+            .from('product_variants')
+            .select('*')
+            .eq('product_id', product.id);
+
+          return {
+            id: product.id,
+            name: product.name,
+            category: product.category,
+            base_price: product.base_price,
+            is_in_stock: product.is_in_stock,
+            is_on_sale: product.is_on_sale,
+            discount_amount: product.discount_amount,
+            measurement_unit: product.measurement_unit,
+            variants: variants || [],
+          };
+        })
+      );
+
+      setProducts(productsWithVariants);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -197,8 +245,8 @@ const SalesReportDashboard: React.FC = () => {
       'Items': o.items.map(i => `${i.name} x${i.quantity}`).join(', '),
     }));
 
-    // Product-wise summary
-    const productSheet = Object.entries(
+    // Product-wise sales summary
+    const productSalesSheet = Object.entries(
       orders.reduce((acc, order) => {
         order.items.forEach(item => {
           if (!acc[item.name]) {
@@ -215,12 +263,28 @@ const SalesReportDashboard: React.FC = () => {
       'Revenue (₹)': data.revenue,
     })).sort((a, b) => b['Revenue (₹)'] - a['Revenue (₹)']);
 
+    // Product Inventory sheet
+    const inventorySheet = products.map(p => {
+      const totalStock = p.variants.reduce((sum, v) => sum + v.stock_quantity, 0);
+      return {
+        'Product Name': p.name,
+        'Category': p.category,
+        'Base Price (₹)': p.base_price,
+        'In Stock': p.is_in_stock ? 'Yes' : 'No',
+        'On Sale': p.is_on_sale ? 'Yes' : 'No',
+        'Discount (₹)': p.discount_amount,
+        'Total Stock': totalStock,
+        'Variants': p.variants.map(v => `${v.quantity}${p.measurement_unit}=₹${v.price}(${v.stock_quantity})`).join(', '),
+      };
+    });
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summarySheet), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailySheet), 'Daily Sales');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(customerSheet), 'Customer Report');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ordersSheet), 'All Orders');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productSheet), 'Product Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productSalesSheet), 'Product Sales');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inventorySheet), 'Product Inventory');
 
     XLSX.writeFile(wb, `PUTHIYAM_Sales_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };

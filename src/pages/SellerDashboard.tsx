@@ -41,7 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X, Share2, BarChart3 } from 'lucide-react';
+import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X, Share2, BarChart3, Bell, Download, DollarSign } from 'lucide-react';
 import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
 import SalesReportDashboard from '@/components/SalesReportDashboard';
 import OrderBillImage from '@/components/OrderBillImage';
@@ -94,6 +94,26 @@ const ORDER_STATUSES = [
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-500' },
 ];
 
+const PAYMENT_STATUSES = [
+  { value: 'pending', label: 'Pending', color: 'bg-yellow-500' },
+  { value: 'paid', label: 'Paid', color: 'bg-green-500' },
+];
+
+interface RequestedProduct {
+  id: string;
+  user_id: string;
+  product_id: string;
+  variant_quantity: number | null;
+  variant_price: number | null;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string | null;
+  status: string;
+  created_at: string;
+  notes: string | null;
+  product?: { name: string };
+}
+
 const MEASUREMENT_UNITS = [
   { value: 'g', label: 'Grams (g)' },
   { value: 'kg', label: 'Kilograms (kg)' },
@@ -110,6 +130,7 @@ const SellerDashboard: React.FC = () => {
   const [products, setProducts] = useState<ProductWithDetails[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [packingTypes, setPackingTypes] = useState<{ id: string; name: string }[]>([]);
+  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('orders');
   const [editingProduct, setEditingProduct] = useState<ProductWithDetails | null>(null);
@@ -162,8 +183,26 @@ const SellerDashboard: React.FC = () => {
       fetchProducts(),
       fetchCategories(),
       fetchPackingTypes(),
+      fetchRequestedProducts(),
     ]);
     setLoading(false);
+  };
+
+  const fetchRequestedProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('requested_products')
+        .select(`
+          *,
+          product:products(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRequestedProducts(data || []);
+    } catch (error) {
+      console.error('Error fetching requested products:', error);
+    }
   };
 
   const fetchOrders = async () => {
@@ -278,6 +317,54 @@ const SellerDashboard: React.FC = () => {
       toast({
         title: "Error",
         description: "Failed to update order status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updatePaymentStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ payment_status: newStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, payment_status: newStatus } : order
+      ));
+
+      toast({
+        title: "Payment Status Updated",
+        description: `Payment marked as ${newStatus}`,
+      });
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update payment status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteRequestedProduct = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('requested_products')
+        .delete()
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      setRequestedProducts(prev => prev.filter(r => r.id !== requestId));
+      toast({ title: "Request Deleted" });
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete request",
         variant: "destructive"
       });
     }
@@ -847,10 +934,19 @@ const SellerDashboard: React.FC = () => {
         </section>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" />
               <span className="hidden sm:inline">Orders</span>
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              <span className="hidden sm:inline">Requests</span>
+              {requestedProducts.length > 0 && (
+                <span className="bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {requestedProducts.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="w-4 h-4" />
@@ -926,10 +1022,24 @@ const SellerDashboard: React.FC = () => {
                             </TableCell>
                             <TableCell className="font-semibold">₹{order.total}</TableCell>
                             <TableCell>
-                              <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
-                                {order.payment_status}
-                              </Badge>
-                              <p className="text-xs text-muted-foreground mt-1">{order.payment_method}</p>
+                              <div className="flex flex-col gap-1">
+                                <Select
+                                  value={order.payment_status}
+                                  onValueChange={(value) => updatePaymentStatus(order.id, value)}
+                                >
+                                  <SelectTrigger className="w-24 h-7">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {PAYMENT_STATUSES.map((status) => (
+                                      <SelectItem key={status.value} value={status.value}>
+                                        {status.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">{order.payment_method}</p>
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge className={`${getStatusColor(order.order_status)} text-white`}>
@@ -1001,6 +1111,112 @@ const SellerDashboard: React.FC = () => {
                                   total={order.total}
                                   createdAt={order.created_at}
                                 />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Requested Products Tab */}
+          <TabsContent value="requests" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Pre-Booked Products ({requestedProducts.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {requestedProducts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No pre-booking requests yet</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Variant</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {requestedProducts.map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell className="text-sm">
+                              {formatDate(request.created_at)}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {request.product?.name || 'Unknown Product'}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{request.customer_name}</p>
+                                <p className="text-xs text-muted-foreground">{request.customer_phone}</p>
+                                {request.customer_address && (
+                                  <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                    {request.customer_address}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {request.variant_quantity && request.variant_price ? (
+                                <span>{request.variant_quantity}g - ₹{request.variant_price}</span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                                {request.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Navigate to product to restock
+                                    const product = products.find(p => p.id === request.product_id);
+                                    if (product) {
+                                      setEditingProduct(product);
+                                      setActiveTab('add');
+                                    }
+                                  }}
+                                >
+                                  Restock
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Request?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will remove this pre-booking request.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => deleteRequestedProduct(request.id)}>
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1184,7 +1400,10 @@ const SellerDashboard: React.FC = () => {
                           </div>
 
                           <div className="text-sm text-muted-foreground">
-                            Variants: {product.variants.map(v => `${v.quantity}${product.measurement_unit} = ₹${v.price}`).join(', ')}
+                            Variants: {product.variants.map(v => `${v.quantity}${product.measurement_unit} = ₹${v.price} (Stock: ${v.stock_quantity})`).join(', ')}
+                          </div>
+                          <div className="text-sm font-medium">
+                            📦 Total Stock: {product.variants.reduce((sum, v) => sum + v.stock_quantity, 0)} units
                           </div>
                         </div>
                       </div>
