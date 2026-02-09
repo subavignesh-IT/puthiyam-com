@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SaleCountdownTimerProps {
   endTime: string;
   compact?: boolean;
+  productId?: string;
+  onExpired?: () => void;
 }
 
-const SaleCountdownTimer: React.FC<SaleCountdownTimerProps> = ({ endTime, compact = false }) => {
+const SaleCountdownTimer: React.FC<SaleCountdownTimerProps> = ({ 
+  endTime, 
+  compact = false, 
+  productId,
+  onExpired 
+}) => {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
     hours: number;
@@ -38,11 +46,40 @@ const SaleCountdownTimer: React.FC<SaleCountdownTimerProps> = ({ endTime, compac
     setTimeLeft(calculateTimeLeft());
 
     const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
+      const result = calculateTimeLeft();
+      setTimeLeft(result);
+      
+      // When expired, auto-toggle off the sale in database
+      if (result.expired && productId) {
+        clearInterval(timer);
+        handleSaleExpiry();
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [endTime]);
+  }, [endTime, productId]);
+
+  const handleSaleExpiry = async () => {
+    if (!productId) return;
+    
+    try {
+      await supabase
+        .from('products')
+        .update({ 
+          is_on_sale: false, 
+          sale_end_time: null,
+          discount_amount: 0 
+        })
+        .eq('id', productId);
+      
+      // Trigger callback to update local state
+      if (onExpired) {
+        onExpired();
+      }
+    } catch (error) {
+      console.error('Error auto-disabling sale:', error);
+    }
+  };
 
   if (timeLeft.expired) {
     return null;

@@ -1,6 +1,7 @@
 export interface ProductVariant {
   weight: string;
   price: number;
+  stockQuantity?: number;
 }
 
 export interface Product {
@@ -18,6 +19,7 @@ export interface Product {
   discountAmount?: number;
   discountType?: 'amount' | 'percentage';
   saleEndTime?: string | null;
+  totalStock?: number;
 }
 
 export interface CartItem extends Product {
@@ -82,4 +84,18 @@ export interface DbProductImage {
   is_primary: boolean | null;
   display_order: number | null;
   created_at: string;
+}
+
+export interface RequestedProduct {
+  id: string;
+  user_id: string;
+  product_id: string;
+  variant_quantity: number | null;
+  variant_price: number | null;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string | null;
+  status: string;
+  created_at: string;
+  notes: string | null;
 }

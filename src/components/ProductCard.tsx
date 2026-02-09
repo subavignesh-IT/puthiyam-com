@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '@/types/product';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Percent } from 'lucide-react';
+import { Percent, AlertTriangle } from 'lucide-react';
 import SaleCountdownTimer from './SaleCountdownTimer';
 
 interface ProductCardProps {
@@ -12,19 +12,25 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const navigate = useNavigate();
+  const [saleExpired, setSaleExpired] = useState(false);
 
   const handleCardClick = () => {
     navigate(`/product/${product.id}`);
   };
+
+  const handleSaleExpired = useCallback(() => {
+    setSaleExpired(true);
+  }, []);
 
   // Get the lowest price from variants or use base price
   const displayPrice = product.variants && product.variants.length > 0
     ? product.variants[0].price
     : product.price;
 
-  // Calculate discounted price if on sale
+  // Calculate discounted price if on sale (and sale hasn't expired locally)
+  const isOnSale = product.isOnSale && !saleExpired;
   const calculateFinalPrice = () => {
-    if (!product.isOnSale || !product.discountAmount) return displayPrice;
+    if (!isOnSale || !product.discountAmount) return displayPrice;
     if (product.discountType === 'percentage') {
       return Math.max(0, Math.round(displayPrice - (displayPrice * product.discountAmount / 100)));
     }
@@ -32,8 +38,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   };
   const finalPrice = calculateFinalPrice();
 
-  // Check if it's a limited time sale
-  const hasLimitedSale = product.isOnSale && product.saleEndTime;
+  // Check if it's a limited time sale (and not expired)
+  const hasLimitedSale = isOnSale && product.saleEndTime;
+
+  // Calculate total stock from variants
+  const totalStock = product.totalStock || 0;
+  const showLimitedStock = totalStock > 0 && totalStock <= 5;
 
   return (
     <Card 
@@ -47,7 +57,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute top-2 left-2 flex flex-col gap-1">
-          {product.isOnSale && product.discountAmount && product.discountAmount > 0 && (
+          {isOnSale && product.discountAmount && product.discountAmount > 0 && (
             <Badge className="bg-destructive text-destructive-foreground text-xs shadow-lg">
               <Percent className="w-3 h-3 mr-1" />
               {product.discountType === 'percentage' ? `${product.discountAmount}%` : `₹${product.discountAmount}`} OFF
@@ -56,6 +66,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.isInStock === false && (
             <Badge variant="destructive" className="text-xs">
               Out of Stock
+            </Badge>
+          )}
+          {showLimitedStock && product.isInStock !== false && (
+            <Badge variant="secondary" className="text-xs bg-orange-500 text-white">
+              <AlertTriangle className="w-3 h-3 mr-1" />
+              Only {totalStock} left!
             </Badge>
           )}
         </div>
@@ -67,7 +83,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Limited sale timer - bottom right, highlighted */}
         {hasLimitedSale && (
           <div className="absolute bottom-2 right-2 animate-pulse">
-            <SaleCountdownTimer endTime={product.saleEndTime!} compact />
+            <SaleCountdownTimer 
+              endTime={product.saleEndTime!} 
+              compact 
+              productId={product.id}
+              onExpired={handleSaleExpired}
+            />
           </div>
         )}
         {/* Glow effect on hover */}
@@ -82,7 +103,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </p>
         <div className="flex items-center justify-between">
           <div>
-            {product.isOnSale && product.discountAmount && product.discountAmount > 0 ? (
+            {isOnSale && product.discountAmount && product.discountAmount > 0 ? (
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold text-primary">₹{finalPrice}</span>
                 <span className="text-sm text-muted-foreground line-through">₹{displayPrice}</span>
