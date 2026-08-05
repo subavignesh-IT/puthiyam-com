@@ -1,44 +1,51 @@
-## POS UX Overhaul + Infinite Stock Toggle
+# POS Overhaul + Seller Login Alerts
 
-### 1. POS Flow Redesign (Vyapar-style, faster)
+## 1. POS: 3-Tab Structure (Product / Cart / Customer)
 
-Rewrite `src/components/POSTab.tsx` into a clean 2-step wizard with proper grid alignment:
+Replace the current 2-step wizard in `src/components/POSTab.tsx` with **three tabs**:
 
-**Step 1 — Build Cart (default view)**
+- **Product** — search, browse, scan and add items
+- **Cart** — review selected items with fast qty controls
+- **Customer** — customer details + payment
 
-- Left pane (60%): Product search bar (sticky top) + responsive product grid (2-4 cols). Tap card → instantly adds to cart with default variant.
-- Right pane (40%): Live cart with qty +/- controls, per-line total, running subtotal, wholesale auto-applied.
-- Bottom action bar (sticky): "Proceed to Customer →" button (disabled until cart has items).
+### Responsive behavior
+- **Mobile (<768px)**: only one tab visible at a time, switch via top tab bar. Product tab is the entry point.
+- **Desktop (≥768px)**: split view — Product on the left, Cart+Customer stacked on the right (both always visible). Tabs collapse into that layout.
 
-**Step 2 — Customer + Payment**
+```text
+Mobile:                Desktop:
+[Product|Cart|Cust]    ┌─────────┬──────────┐
+┌─────────────────┐    │ Product │  Cart    │
+│   active tab    │    │  (list) ├──────────┤
+└─────────────────┘    │         │ Customer │
+                       └─────────┴──────────┘
+```
 
-- Compact form: saved-customer dropdown + [+] add new, courier toggle, payment method (Cash / UPI QR), amount tendered for cash.
-- "← Back to Cart" and "Generate Bill" buttons.
-- On confirm → JPG bill preview with Share / Download / New Sale.
+## 2. Product Tab Enhancements
+- Product search (already exists) — keep and improve
+- **Barcode/QR scan button** using `html5-qrcode` (camera-based). Scans a code → matches against `products.id` or SKU → auto-adds default variant to cart
+- Tap product → adds to cart with default variant
 
-**Alignment fixes**
+## 3. Cart Tab Enhancements
+- Fast quantity controls: `−` / `+` buttons + inline editable number input for each line item
+- Trash icon to remove
+- Live subtotal, delivery, wholesale tier hint
 
-- Consistent 12px gap grid, `items-stretch`, equal-height cards, right-aligned prices, tabular-nums for money, larger tap targets (min 44px).
-- Keyboard shortcut: `/` focuses search, `Enter` on search adds top result.
+## 4. Customer Tab Enhancements
+- **Customer search field** with typeahead against `pos_customers` — pick a match to autofill name / phone / address
+- `+` icon still opens manual add
+- Delivery override inputs
+- Payment section: Cash / UPI / QR
+- **Default UPI ID: `kathaiahkarthik@okhdfcbank`** used for the UPI intent link and QR image when the seller has no custom UPI configured
+- Generate JPG bill on confirm (existing flow)
 
-### 2. Infinite Stock Toggle
+## 5. Seller Login WhatsApp Notification
+- New edge function `supabase/functions/notify-seller-login/index.ts` that sends a WhatsApp message to `9361284773` via the existing Twilio setup, including seller name + ISO timestamp
+- Trigger from `src/hooks/useAuth.tsx` `signIn()` after confirming the user has the `seller` role (check via `has_role` RPC). Fire-and-forget so login isn't blocked
 
-- Add `unlimited_stock BOOLEAN DEFAULT false` to `products` table (migration).
-- In `SellerDashboard` product form: toggle "Unlimited stock (never runs out)". When ON → hide stock qty inputs on variants, hide "Limited stock" badge on cards, skip low-stock alerts.
-- Update `ProductCard`, POS product grid, and low-stock warnings to respect the flag.
-
-## 3. Transfer toggles
-
-Transfer all members role toggle button to admin dashboard with all sellers details and customer details of roles tab is newly created and seller have only a customer details .
-
-Seller delete a customer in customer tab is retail force a customer to re login 
-
-Improve working of seller signin if customer is already on seller signin is get a details from seller of shop name ,product sells , customer care number.
-
-&nbsp;
-
-### Technical details
-
-- Files touched: `src/components/POSTab.tsx` (rewrite), `src/pages/SellerDashboard.tsx` (toggle in add/edit form + hide stock UI when infinite), `src/components/ProductCard.tsx` (skip badges), `src/types/product.ts` (add `unlimitedStock`).
-- Migration: `ALTER TABLE products ADD COLUMN unlimited_stock BOOLEAN NOT NULL DEFAULT false;`
-- No changes to online checkout, auth, or bill image logic.
+## Technical Notes
+- Add dependency: `html5-qrcode` for barcode scanning
+- No DB schema changes required (POS uses existing `pos_customers`, `products`)
+- Default UPI constant lives in `POSTab.tsx`; falls back to seller's profile UPI if set
+- Notification function reuses existing Twilio secrets (`TWILIO_API_KEY`, `TWILIO_FROM_NUMBER`)
+- Keep existing JPG invoice generation, wholesale logic, and 2→3 tab data flow intact

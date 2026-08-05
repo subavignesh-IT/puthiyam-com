@@ -87,6 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await supabase.auth.signOut();
           return { error: new Error('Your account has been blocked. Please contact support.') };
         }
+
+        // Fire-and-forget seller sign-in alert (server verifies the seller role)
+        supabase.functions
+          .invoke('notify-seller-login')
+          .catch((e) => console.warn('seller login notification failed', e));
       }
       
       return { error: null };

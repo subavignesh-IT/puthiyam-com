@@ -11,11 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Minus, Trash2, Download, Share2, Store, QrCode, Search, UserPlus,
-  ShoppingCart, X, Maximize2, Truck, Receipt,
+  ShoppingCart, X, Maximize2, Truck, Receipt, ScanLine, Package, User as UserIcon,
 } from 'lucide-react';
 import { generateOrderId } from '@/utils/orderIdGenerator';
 import { toJpeg } from 'html-to-image';
 import OrderBillImage from '@/components/OrderBillImage';
+import BarcodeScannerDialog from '@/components/BarcodeScannerDialog';
+
+/** Fallback UPI ID used for POS money transactions when the seller has none saved. */
+const DEFAULT_UPI_ID = 'kathaiahkarthik@okhdfcbank';
 
 interface POSTabProps {
   sellerId: string;
@@ -78,6 +82,7 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
   const [savedCustomers, setSavedCustomers] = useState<POSCustomer[]>([]);
   const [addCustOpen, setAddCustOpen] = useState(false);
   const [newCust, setNewCust] = useState({ name: '', phone: '', address: '' });
+  const [custSearch, setCustSearch] = useState('');
 
   // Delivery
   const [deliveryType, setDeliveryType] = useState<'self-pickup' | 'shipping'>('self-pickup');
@@ -85,12 +90,13 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
 
   // Payment
   const [paymentMode, setPaymentMode] = useState<'cash' | 'upi'>('cash');
-  const [upiId, setUpiId] = useState('');
+  const [upiId, setUpiId] = useState(DEFAULT_UPI_ID);
   const [sellerName, setSellerName] = useState('PUTHIYAM');
 
   const [saving, setSaving] = useState(false);
   const [lastOrder, setLastOrder] = useState<any>(null);
-  const [step, setStep] = useState<'cart' | 'checkout'>('cart');
+  const [tab, setTab] = useState<'product' | 'cart' | 'customer'>('product');
+  const [scanOpen, setScanOpen] = useState(false);
   const billRef = useRef<HTMLDivElement>(null);
   const qrWrapRef = useRef<HTMLDivElement>(null);
 
@@ -121,7 +127,7 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
         };
       });
       setProducts(list);
-      if ((prof as any)?.upi_id) setUpiId((prof as any).upi_id);
+      setUpiId(((prof as any)?.upi_id || '').trim() || DEFAULT_UPI_ID);
       if ((prof as any)?.full_name) setSellerName((prof as any).full_name || 'PUTHIYAM');
       if (Array.isArray(pc)) setSavedCustomers(pc as any);
     })();
@@ -132,6 +138,14 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
     if (!q) return products;
     return products.filter(p => p.name.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q));
   }, [products, search]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = custSearch.trim().toLowerCase();
+    if (!q) return [] as POSCustomer[];
+    return savedCustomers
+      .filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q))
+      .slice(0, 6);
+  }, [savedCustomers, custSearch]);
 
   const addProductToCart = (p: ProductLite, variant?: Variant) => {
     const v = variant || pickDefaultVariant(p.variants);
@@ -170,6 +184,28 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
 
   const removeLine = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
 
+  // Barcode / QR scan → match product by id, name or variant id
+  const handleScan = (code: string) => {
+    const raw = code.trim();
+    const lower = raw.toLowerCase();
+    let variantMatch: Variant | undefined;
+    const prod = products.find(p => {
+      if (p.id === raw) return true;
+      if (p.name.toLowerCase() === lower) return true;
+      const v = p.variants.find(vv => vv.id === raw);
+      if (v) { variantMatch = v; return true; }
+      return false;
+    }) || products.find(p => p.name.toLowerCase().includes(lower));
+
+    if (!prod) {
+      setSearch(raw);
+      toast({ title: 'No product matched the scan', description: raw, variant: 'destructive' });
+      return;
+    }
+    addProductToCart(prod, variantMatch);
+    toast({ title: `Added ${prod.name}` });
+  };
+
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.effectivePrice * l.quantity, 0), [cart]);
 
   const autoCourier = useMemo(() => {
@@ -187,6 +223,9 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
 
   const shippingCost = manualCourier !== '' ? Math.max(0, Number(manualCourier) || 0) : autoCourier;
   const grandTotal = subtotal + shippingCost;
+
+  // On desktop both panels show; the right column falls back to Cart unless Customer is active.
+  const rightView: 'cart' | 'customer' = tab === 'customer' ? 'customer' : 'cart';
 
   // UPI URL + QR
   const upiPayUrl = useMemo(() => {
@@ -264,7 +303,8 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
     setCustomerAddress('');
     setManualCourier('');
     setDeliveryType('self-pickup');
-    setStep('cart');
+    setCustSearch('');
+    setTab('product');
   };
 
   const buildBillItems = () => cart.map(l => ({
@@ -412,185 +452,260 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
             </Button>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] h-[calc(100vh-56px)] overflow-hidden">
-            {/* LEFT: search + product grid */}
-            <div className="flex flex-col border-r bg-muted/20 overflow-hidden">
-              <div className="p-3 border-b bg-card sticky top-0 z-10">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    placeholder="Search products by name or category…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 h-11 text-base"
-                  />
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3">
-                {filteredProducts.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-10">No products found</p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 items-stretch">
-                    {filteredProducts.map((p) => {
-                      const dv = pickDefaultVariant(p.variants);
-                      const price = dv?.price ?? p.base_price;
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => addProductToCart(p)}
-                          className="group flex flex-col h-full text-left rounded-lg border bg-card hover:border-primary hover:shadow-md active:scale-[0.98] transition overflow-hidden"
-                        >
-                          <div className="aspect-square bg-muted overflow-hidden">
-                            {p.image ? (
-                              <img src={p.image} alt={p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No image</div>
-                            )}
-                          </div>
-                          <div className="p-2 flex-1 flex flex-col justify-between gap-1">
-                            <p className="text-sm font-medium line-clamp-2 leading-tight">{p.name}</p>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-bold text-primary">₹{price}</span>
-                              {dv && <span className="text-[10px] text-muted-foreground">{dv.quantity}</span>}
-                            </div>
-                            {p.variants.length > 1 && (
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <Select onValueChange={(vid) => {
-                                  const vv = p.variants.find(x => x.id === vid);
-                                  if (vv) addProductToCart(p, vv);
-                                }}>
-                                  <SelectTrigger className="h-7 text-[11px]"><SelectValue placeholder="+ variant" /></SelectTrigger>
-                                  <SelectContent>
-                                    {p.variants.map(vv => (
-                                      <SelectItem key={vv.id} value={vv.id}>{vv.quantity} — ₹{vv.price}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+          <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
+            {/* Point tabs: Product → Cart → Customer */}
+            <div className="px-2 py-2 border-b bg-card flex items-center gap-2 overflow-x-auto shrink-0">
+              {([
+                { key: 'product', label: 'Product', icon: Package, hint: 'Select' },
+                { key: 'cart', label: 'Cart', icon: ShoppingCart, hint: `${cart.length}` },
+                { key: 'customer', label: 'Customer', icon: UserIcon, hint: 'Details' },
+              ] as const).map((t, i) => {
+                const Icon = t.icon;
+                const active = tab === t.key;
+                const disabled = t.key === 'customer' && cart.length === 0;
+                return (
+                  <React.Fragment key={t.key}>
+                    {i > 0 && <span className="text-muted-foreground text-xs">→</span>}
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setTab(t.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 active:scale-95 disabled:opacity-40 ${
+                        active
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-background/30 flex items-center justify-center text-[10px]">{i + 1}</span>
+                      <Icon className="w-3.5 h-3.5" />
+                      {t.label}
+                      <span className="text-[10px] opacity-70">{t.hint}</span>
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+              <span className="ml-auto text-sm font-bold text-primary tabular-nums pr-1 whitespace-nowrap">
+                ₹{grandTotal.toFixed(2)}
+              </span>
             </div>
 
-            {/* RIGHT: cart / bill */}
-            <div className="flex flex-col bg-card overflow-hidden">
-              {/* Step indicator */}
-              <div className="px-3 py-2 border-b bg-card flex items-center gap-2 text-xs font-medium">
-                <button
-                  type="button"
-                  onClick={() => setStep('cart')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full transition ${step === 'cart' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'}`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-background/30 flex items-center justify-center text-[10px]">1</span>
-                  Cart
-                </button>
-                <span className="text-muted-foreground">→</span>
-                <button
-                  type="button"
-                  onClick={() => cart.length > 0 && setStep('checkout')}
-                  disabled={cart.length === 0}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full transition ${step === 'checkout' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'} disabled:opacity-50`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-background/30 flex items-center justify-center text-[10px]">2</span>
-                  Customer & Payment
-                </button>
-                <span className="ml-auto text-muted-foreground tabular-nums">
-                  {cart.length} item{cart.length !== 1 ? 's' : ''}
-                </span>
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_420px] overflow-hidden">
+              {/* PRODUCT PANEL — full screen on mobile when active, always visible on desktop */}
+              <div className={`${tab === 'product' ? 'flex' : 'hidden'} lg:flex flex-col border-r bg-muted/20 overflow-hidden`}>
+                <div className="p-3 border-b bg-card z-10 flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      placeholder="Search products by name or category…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-10 h-11 text-base"
+                    />
+                  </div>
+                  <Button variant="outline" className="h-11 shrink-0" onClick={() => setScanOpen(true)} title="Scan barcode / QR">
+                    <ScanLine className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Scan</span>
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3">
+                  {filteredProducts.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-10">No products found</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 items-stretch">
+                      {filteredProducts.map((p) => {
+                        const dv = pickDefaultVariant(p.variants);
+                        const price = dv?.price ?? p.base_price;
+                        const inCart = cart.filter(l => l.productId === p.id).reduce((s, l) => s + l.quantity, 0);
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => addProductToCart(p)}
+                            className="group relative flex flex-col h-full text-left rounded-lg border bg-card hover:border-primary hover:shadow-md active:scale-[0.97] transition-all duration-200 overflow-hidden"
+                          >
+                            {inCart > 0 && (
+                              <span className="absolute top-1 right-1 z-10 bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow">
+                                {inCart}
+                              </span>
+                            )}
+                            <div className="aspect-square bg-muted overflow-hidden">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No image</div>
+                              )}
+                            </div>
+                            <div className="p-2 flex-1 flex flex-col justify-between gap-1">
+                              <p className="text-sm font-medium line-clamp-2 leading-tight">{p.name}</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-primary">₹{price}</span>
+                                {dv && <span className="text-[10px] text-muted-foreground">{dv.quantity}</span>}
+                              </div>
+                              {p.variants.length > 1 && (
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Select onValueChange={(vid) => {
+                                    const vv = p.variants.find(x => x.id === vid);
+                                    if (vv) addProductToCart(p, vv);
+                                  }}>
+                                    <SelectTrigger className="h-7 text-[11px]"><SelectValue placeholder="+ variant" /></SelectTrigger>
+                                    <SelectContent>
+                                      {p.variants.map(vv => (
+                                        <SelectItem key={vv.id} value={vv.id}>{vv.quantity} — ₹{vv.price}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                {/* Mobile-only jump to cart */}
+                <div className="lg:hidden border-t p-3 bg-card">
+                  <Button
+                    className="w-full gradient-hero text-primary-foreground h-11"
+                    disabled={cart.length === 0}
+                    onClick={() => setTab('cart')}
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    View Cart ({cart.length}) — ₹{subtotal.toFixed(2)}
+                  </Button>
+                </div>
               </div>
 
-              {/* STEP 1: CART */}
-              {step === 'cart' && (
-                <>
-                  <div className="flex-1 overflow-y-auto p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                        <ShoppingCart className="w-3 h-3" /> Cart ({cart.length})
-                      </span>
-                      {cart.length > 0 && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setCart([])}>
-                          Clear
-                        </Button>
+              {/* CART + CUSTOMER PANEL */}
+              <div className={`${tab === 'product' ? 'hidden' : 'flex'} lg:flex flex-col bg-card overflow-hidden`}>
+                {/* CART VIEW */}
+                {rightView === 'cart' && (
+                  <>
+                    <div className="flex-1 overflow-y-auto p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                          <ShoppingCart className="w-3 h-3" /> Cart ({cart.length})
+                        </span>
+                        {cart.length > 0 && (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setCart([])}>
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      {cart.length === 0 ? (
+                        <div className="text-center text-sm text-muted-foreground py-10">
+                          Add items from the <strong>Product</strong> tab.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {cart.map((l, i) => (
+                            <div key={i} className="rounded-lg border p-2 bg-background animate-in fade-in slide-in-from-bottom-1 duration-200">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{l.name}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {l.variant ? `${l.variant.quantity} • ` : ''}
+                                    ₹{l.effectivePrice}
+                                    {l.wholesaleApplied && (
+                                      <span className="ml-1 text-green-600 font-medium">(wholesale)</span>
+                                    )}
+                                  </p>
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => removeLine(i)}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                              <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center gap-1">
+                                  <Button variant="outline" size="icon" className="h-9 w-9 active:scale-90 transition-transform" onClick={() => updateQty(i, l.quantity - 1)}>
+                                    <Minus className="w-4 h-4" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={1}
+                                    value={l.quantity}
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    onChange={(e) => updateQty(i, parseInt(e.target.value) || 1)}
+                                    className="h-9 w-16 text-center text-base font-semibold"
+                                  />
+                                  <Button variant="outline" size="icon" className="h-9 w-9 active:scale-90 transition-transform" onClick={() => updateQty(i, l.quantity + 1)}>
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                  <div className="flex gap-1 ml-1">
+                                    {[5, 10].map(step => (
+                                      <Button key={step} variant="ghost" size="sm" className="h-9 px-2 text-[11px]" onClick={() => updateQty(i, l.quantity + step)}>
+                                        +{step}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <span className="text-sm font-bold tabular-nums">₹{(l.effectivePrice * l.quantity).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    {cart.length === 0 ? (
-                      <div className="text-center text-sm text-muted-foreground py-10">
-                        Tap a product on the left to add it.
+                    <div className="border-t p-3 space-y-2 bg-muted/20">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Subtotal</span>
+                        <span className="text-primary tabular-nums">₹{subtotal.toFixed(2)}</span>
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {cart.map((l, i) => (
-                          <div key={i} className="rounded-lg border p-2 bg-background">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{l.name}</p>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {l.variant ? `${l.variant.quantity} • ` : ''}
-                                  ₹{l.effectivePrice}
-                                  {l.wholesaleApplied && (
-                                    <span className="ml-1 text-green-600 font-medium">(wholesale)</span>
-                                  )}
-                                </p>
-                              </div>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive shrink-0" onClick={() => removeLine(i)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <div className="flex items-center gap-1">
-                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(i, l.quantity - 1)}>
-                                  <Minus className="w-3 h-3" />
-                                </Button>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={l.quantity}
-                                  onChange={(e) => updateQty(i, parseInt(e.target.value) || 1)}
-                                  className="h-7 w-14 text-center text-sm"
-                                />
-                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(i, l.quantity + 1)}>
-                                  <Plus className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <span className="text-sm font-bold tabular-nums">₹{(l.effectivePrice * l.quantity).toFixed(2)}</span>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" className="h-11 lg:hidden" onClick={() => setTab('product')}>
+                          ← Products
+                        </Button>
+                        <Button
+                          className="gradient-hero text-primary-foreground h-11 col-span-1 lg:col-span-2"
+                          disabled={cart.length === 0}
+                          onClick={() => setTab('customer')}
+                        >
+                          Next: Customer →
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                  <div className="border-t p-3 space-y-2 bg-muted/20">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Subtotal</span>
-                      <span className="text-primary tabular-nums">₹{subtotal.toFixed(2)}</span>
                     </div>
-                    <Button
-                      className="w-full gradient-hero text-primary-foreground h-11"
-                      disabled={cart.length === 0}
-                      onClick={() => setStep('checkout')}
-                    >
-                      Next: Customer & Payment →
-                    </Button>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
 
-              {/* STEP 2: CHECKOUT */}
-              {step === 'checkout' && (
-                <>
-                  <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                    {/* Customer */}
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">Customer</Label>
-                      <div className="flex gap-2">
+                {/* CUSTOMER + PAYMENT VIEW */}
+                {rightView === 'customer' && (
+                  <>
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                      {/* Customer search + autofill */}
+                      <div className="space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Customer</Label>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search saved customer by name or phone…"
+                              value={custSearch}
+                              onChange={(e) => setCustSearch(e.target.value)}
+                              className="pl-10 h-10 text-sm"
+                            />
+                            {filteredCustomers.length > 0 && (
+                              <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg border bg-popover shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                {filteredCustomers.map(c => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => { pickCustomer(c.id); setCustSearch(''); }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex justify-between gap-2"
+                                  >
+                                    <span className="truncate font-medium">{c.name}</span>
+                                    <span className="text-muted-foreground text-xs shrink-0">{c.phone}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => setAddCustOpen(true)} title="Add customer">
+                            <UserPlus className="w-4 h-4" />
+                          </Button>
+                        </div>
                         <Select value={customerId || '__walkin__'} onValueChange={pickCustomer}>
-                          <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__walkin__">Walk-in Customer</SelectItem>
                             {savedCustomers.map(c => (
@@ -598,104 +713,104 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button size="icon" variant="outline" onClick={() => setAddCustOpen(true)} title="Add customer">
-                          <UserPlus className="w-4 h-4" />
-                        </Button>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <Input placeholder="Name" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-10 text-sm" />
+                          <Input placeholder="Phone" inputMode="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-10 text-sm" />
+                        </div>
                       </div>
+
                       <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Name" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-10 text-sm" />
-                        <Input placeholder="Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-10 text-sm" />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-[11px] text-muted-foreground flex items-center gap-1"><Truck className="w-3 h-3" /> Delivery</Label>
-                        <Select value={deliveryType} onValueChange={(v) => setDeliveryType(v as any)}>
-                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="self-pickup">Self Pickup</SelectItem>
-                            <SelectItem value="shipping">Home Delivery</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-[11px] text-muted-foreground">Courier ₹ (override)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder={`${autoCourier}`}
-                          value={manualCourier}
-                          onChange={e => setManualCourier(e.target.value)}
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                    </div>
-                    {deliveryType === 'shipping' && (
-                      <Input placeholder="Delivery address" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="h-9 text-sm" />
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-[11px] text-muted-foreground">Payment</Label>
-                        <Select value={paymentMode} onValueChange={v => setPaymentMode(v as any)}>
-                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="upi">UPI (QR)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {paymentMode === 'upi' && (
                         <div>
-                          <Label className="text-[11px] text-muted-foreground">UPI ID</Label>
-                          <Input value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="you@upi" className="h-9 text-sm" />
+                          <Label className="text-[11px] text-muted-foreground flex items-center gap-1"><Truck className="w-3 h-3" /> Delivery</Label>
+                          <Select value={deliveryType} onValueChange={(v) => setDeliveryType(v as any)}>
+                            <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="self-pickup">Self Pickup</SelectItem>
+                              <SelectItem value="shipping">Home Delivery</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Courier ₹ (override)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder={`${autoCourier}`}
+                            value={manualCourier}
+                            onChange={e => setManualCourier(e.target.value)}
+                            className="h-10 text-sm"
+                          />
+                        </div>
+                      </div>
+                      {deliveryType === 'shipping' && (
+                        <Input placeholder="Delivery address" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="h-10 text-sm" />
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Payment</Label>
+                          <Select value={paymentMode} onValueChange={v => setPaymentMode(v as any)}>
+                            <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="upi">UPI (QR)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {paymentMode === 'upi' && (
+                          <div>
+                            <Label className="text-[11px] text-muted-foreground">UPI ID</Label>
+                            <Input value={upiId} onChange={e => setUpiId(e.target.value)} placeholder={DEFAULT_UPI_ID} className="h-10 text-sm" />
+                          </div>
+                        )}
+                      </div>
+
+                      {paymentMode === 'upi' && upiId && grandTotal > 0 && (
+                        <div ref={qrWrapRef} className="flex flex-col items-center gap-2 p-3 rounded-lg border bg-background animate-in fade-in zoom-in-95 duration-200">
+                          <QrCode className="w-4 h-4 text-primary" />
+                          <img src={qrSrc} alt="UPI QR" className="w-44 h-44" />
+                          <p className="text-xs text-muted-foreground">Scan to pay ₹{grandTotal.toFixed(2)} — {upiId}</p>
+                          <Button variant="outline" size="sm" onClick={shareQrImage}>
+                            <Share2 className="w-3 h-3 mr-1" /> Send QR
+                          </Button>
                         </div>
                       )}
                     </div>
 
-                    {paymentMode === 'upi' && upiId && grandTotal > 0 && (
-                      <div ref={qrWrapRef} className="flex flex-col items-center gap-2 p-3 rounded-lg border bg-background">
-                        <QrCode className="w-4 h-4 text-primary" />
-                        <img src={qrSrc} alt="UPI QR" className="w-44 h-44" />
-                        <p className="text-xs text-muted-foreground">Scan to pay ₹{grandTotal.toFixed(2)}</p>
-                        <Button variant="outline" size="sm" onClick={shareQrImage}>
-                          <Share2 className="w-3 h-3 mr-1" /> Send QR
+                    <div className="border-t p-3 space-y-3 bg-muted/20">
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">₹{subtotal.toFixed(2)}</span></div>
+                        {shippingCost > 0 && (
+                          <div className="flex justify-between text-muted-foreground"><span>Courier</span><span className="tabular-nums">₹{shippingCost.toFixed(2)}</span></div>
+                        )}
+                        <div className="flex justify-between text-lg font-bold pt-1 border-t">
+                          <span>TOTAL</span><span className="text-primary tabular-nums">₹{grandTotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" onClick={() => setTab('cart')} className="h-11">
+                          ← Cart
+                        </Button>
+                        <Button
+                          className="gradient-hero text-primary-foreground h-11"
+                          disabled={saving || cart.length === 0}
+                          onClick={saveAndShare}
+                        >
+                          <Share2 className="w-4 h-4 mr-2" />
+                          {saving ? 'Saving…' : 'Save & Share'}
                         </Button>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="border-t p-3 space-y-3 bg-muted/20">
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">₹{subtotal.toFixed(2)}</span></div>
-                      {shippingCost > 0 && (
-                        <div className="flex justify-between text-muted-foreground"><span>Courier</span><span className="tabular-nums">₹{shippingCost.toFixed(2)}</span></div>
-                      )}
-                      <div className="flex justify-between text-lg font-bold pt-1 border-t">
-                        <span>TOTAL</span><span className="text-primary tabular-nums">₹{grandTotal.toFixed(2)}</span>
-                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={() => setStep('cart')} className="h-11">
-                        ← Back to Cart
-                      </Button>
-                      <Button
-                        className="gradient-hero text-primary-foreground h-11"
-                        disabled={saving || cart.length === 0}
-                        onClick={saveAndShare}
-                      >
-                        <Share2 className="w-4 h-4 mr-2" />
-                        {saving ? 'Saving…' : 'Save & Share'}
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Barcode / QR scanner */}
+      <BarcodeScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
 
       {/* Add customer dialog */}
       <Dialog open={addCustOpen} onOpenChange={setAddCustOpen}>
