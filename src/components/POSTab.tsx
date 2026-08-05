@@ -224,6 +224,9 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
   const shippingCost = manualCourier !== '' ? Math.max(0, Number(manualCourier) || 0) : autoCourier;
   const grandTotal = subtotal + shippingCost;
 
+  // On desktop both panels show; the right column falls back to Cart unless Customer is active.
+  const rightView: 'cart' | 'customer' = tab === 'customer' ? 'customer' : 'cart';
+
   // UPI URL + QR
   const upiPayUrl = useMemo(() => {
     if (!upiId || grandTotal <= 0) return '';
