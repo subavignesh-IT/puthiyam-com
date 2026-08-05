@@ -809,6 +809,9 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
         </DialogContent>
       </Dialog>
 
+      {/* Barcode / QR scanner */}
+      <BarcodeScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
+
       {/* Add customer dialog */}
       <Dialog open={addCustOpen} onOpenChange={setAddCustOpen}>
         <DialogContent className="max-w-sm">
