@@ -15,6 +15,10 @@ const REGION_ID = 'pos-barcode-region';
 const BarcodeScannerDialog: React.FC<Props> = ({ open, onOpenChange, onScan }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
 
   useEffect(() => {
     if (!open) return;
@@ -31,8 +35,8 @@ const BarcodeScannerDialog: React.FC<Props> = ({ open, onOpenChange, onScan }) =
           { facingMode: 'environment' },
           { fps: 12, qrbox: { width: 260, height: 180 } },
           (decodedText) => {
-            onScan(decodedText);
-            onOpenChange(false);
+            onScanRef.current(decodedText);
+            onOpenChangeRef.current(false);
           },
           () => {},
         );
@@ -54,7 +58,7 @@ const BarcodeScannerDialog: React.FC<Props> = ({ open, onOpenChange, onScan }) =
         s.stop().then(() => s.clear()).catch(() => {});
       }
     };
-  }, [open, onScan, onOpenChange]);
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
