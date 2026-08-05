@@ -127,7 +127,7 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
         };
       });
       setProducts(list);
-      if ((prof as any)?.upi_id) setUpiId((prof as any).upi_id);
+      setUpiId(((prof as any)?.upi_id || '').trim() || DEFAULT_UPI_ID);
       if ((prof as any)?.full_name) setSellerName((prof as any).full_name || 'PUTHIYAM');
       if (Array.isArray(pc)) setSavedCustomers(pc as any);
     })();
@@ -138,6 +138,14 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
     if (!q) return products;
     return products.filter(p => p.name.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q));
   }, [products, search]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = custSearch.trim().toLowerCase();
+    if (!q) return [] as POSCustomer[];
+    return savedCustomers
+      .filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q))
+      .slice(0, 6);
+  }, [savedCustomers, custSearch]);
 
   const addProductToCart = (p: ProductLite, variant?: Variant) => {
     const v = variant || pickDefaultVariant(p.variants);
@@ -175,6 +183,28 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
   };
 
   const removeLine = (idx: number) => setCart(prev => prev.filter((_, i) => i !== idx));
+
+  // Barcode / QR scan → match product by id, name or variant id
+  const handleScan = (code: string) => {
+    const raw = code.trim();
+    const lower = raw.toLowerCase();
+    let variantMatch: Variant | undefined;
+    const prod = products.find(p => {
+      if (p.id === raw) return true;
+      if (p.name.toLowerCase() === lower) return true;
+      const v = p.variants.find(vv => vv.id === raw);
+      if (v) { variantMatch = v; return true; }
+      return false;
+    }) || products.find(p => p.name.toLowerCase().includes(lower));
+
+    if (!prod) {
+      setSearch(raw);
+      toast({ title: 'No product matched the scan', description: raw, variant: 'destructive' });
+      return;
+    }
+    addProductToCart(prod, variantMatch);
+    toast({ title: `Added ${prod.name}` });
+  };
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.effectivePrice * l.quantity, 0), [cart]);
 
@@ -270,7 +300,8 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
     setCustomerAddress('');
     setManualCourier('');
     setDeliveryType('self-pickup');
-    setStep('cart');
+    setCustSearch('');
+    setTab('product');
   };
 
   const buildBillItems = () => cart.map(l => ({
