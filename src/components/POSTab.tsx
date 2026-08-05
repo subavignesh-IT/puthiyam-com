@@ -11,11 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Minus, Trash2, Download, Share2, Store, QrCode, Search, UserPlus,
-  ShoppingCart, X, Maximize2, Truck, Receipt,
+  ShoppingCart, X, Maximize2, Truck, Receipt, ScanLine, Package, User as UserIcon,
 } from 'lucide-react';
 import { generateOrderId } from '@/utils/orderIdGenerator';
 import { toJpeg } from 'html-to-image';
 import OrderBillImage from '@/components/OrderBillImage';
+import BarcodeScannerDialog from '@/components/BarcodeScannerDialog';
+
+/** Fallback UPI ID used for POS money transactions when the seller has none saved. */
+const DEFAULT_UPI_ID = 'kathaiahkarthik@okhdfcbank';
 
 interface POSTabProps {
   sellerId: string;
@@ -78,6 +82,7 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
   const [savedCustomers, setSavedCustomers] = useState<POSCustomer[]>([]);
   const [addCustOpen, setAddCustOpen] = useState(false);
   const [newCust, setNewCust] = useState({ name: '', phone: '', address: '' });
+  const [custSearch, setCustSearch] = useState('');
 
   // Delivery
   const [deliveryType, setDeliveryType] = useState<'self-pickup' | 'shipping'>('self-pickup');
@@ -85,12 +90,13 @@ const POSTab: React.FC<POSTabProps> = ({ sellerId }) => {
 
   // Payment
   const [paymentMode, setPaymentMode] = useState<'cash' | 'upi'>('cash');
-  const [upiId, setUpiId] = useState('');
+  const [upiId, setUpiId] = useState(DEFAULT_UPI_ID);
   const [sellerName, setSellerName] = useState('PUTHIYAM');
 
   const [saving, setSaving] = useState(false);
   const [lastOrder, setLastOrder] = useState<any>(null);
-  const [step, setStep] = useState<'cart' | 'checkout'>('cart');
+  const [tab, setTab] = useState<'product' | 'cart' | 'customer'>('product');
+  const [scanOpen, setScanOpen] = useState(false);
   const billRef = useRef<HTMLDivElement>(null);
   const qrWrapRef = useRef<HTMLDivElement>(null);
 
