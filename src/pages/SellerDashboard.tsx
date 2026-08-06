@@ -41,11 +41,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X, Share2, BarChart3, Bell, Download, DollarSign, Users, Gift, Ban, Shield, ShieldCheck, MinusCircle, PlusCircle, Crown, Store } from 'lucide-react';
+import { Package, Plus, Trash2, Upload, ShoppingCart, Edit, Tag, Percent, Settings, Clock, X, Share2, BarChart3, Bell, Download, DollarSign, Users, Gift, Ban, Shield, ShieldCheck, MinusCircle, PlusCircle, Crown, Store, Barcode, Maximize2 } from 'lucide-react';
 import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
 import SalesReportDashboard from '@/components/SalesReportDashboard';
 import OrderBillImage from '@/components/OrderBillImage';
-import POSTab from '@/components/POSTab';
+import BarcodeTab from '@/components/BarcodeTab';
 import { getOrderIdForDisplay } from '@/utils/orderIdGenerator';
 import html2canvas from 'html2canvas';
 
@@ -1452,7 +1452,8 @@ const SellerDashboard: React.FC = () => {
 
         {/* Admin cross-seller dashboard moved to /admin route */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-9' : 'grid-cols-7'}`}>
+          {/* Tab buttons arranged on two rows */}
+          <TabsList className="h-auto w-full grid grid-cols-3 sm:grid-cols-5 gap-1 p-1">
             <TabsTrigger value="orders" className="flex items-center gap-1 text-xs">
               <ShoppingCart className="w-4 h-4" />
               <span className="hidden sm:inline">Orders</span>
@@ -1486,6 +1487,10 @@ const SellerDashboard: React.FC = () => {
               <Package className="w-4 h-4" />
               <span className="hidden sm:inline">Products</span>
             </TabsTrigger>
+            <TabsTrigger value="barcodes" className="flex items-center gap-1 text-xs">
+              <Barcode className="w-4 h-4" />
+              <span className="hidden sm:inline">Barcodes</span>
+            </TabsTrigger>
             <TabsTrigger value="add" className="flex items-center gap-1 text-xs">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add New</span>
@@ -1506,7 +1511,27 @@ const SellerDashboard: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="pos" className="space-y-4">
-            {user && <POSTab sellerId={user.id} />}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Store className="w-5 h-5 text-primary" /> POS / Cash Sale
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Full-screen billing page: product search & scanning, wholesale pricing, courier details,
+                  UPI QR, invoice preview and automatic WhatsApp bill delivery.
+                </p>
+                <Button size="lg" className="gradient-hero text-primary-foreground" onClick={() => navigate('/pos')}>
+                  <Maximize2 className="w-4 h-4 mr-2" /> Open POS
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Barcode Management */}
+          <TabsContent value="barcodes" className="space-y-4">
+            {user && <BarcodeTab sellerId={user.id} />}
           </TabsContent>
 
           {/* Requested Products Tab */}
