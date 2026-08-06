@@ -105,6 +105,9 @@ export type Database = {
       }
       orders: {
         Row: {
+          courier_name: string | null
+          courier_notes: string | null
+          courier_tracking: string | null
           created_at: string
           customer_address: string | null
           customer_name: string
@@ -116,6 +119,7 @@ export type Database = {
           order_number: string | null
           order_status: string
           payment_method: string
+          payment_state: string
           payment_status: string
           sale_channel: string
           shipping_cost: number
@@ -124,6 +128,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          courier_name?: string | null
+          courier_notes?: string | null
+          courier_tracking?: string | null
           created_at?: string
           customer_address?: string | null
           customer_name: string
@@ -135,6 +142,7 @@ export type Database = {
           order_number?: string | null
           order_status?: string
           payment_method: string
+          payment_state?: string
           payment_status: string
           sale_channel?: string
           shipping_cost?: number
@@ -143,6 +151,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          courier_name?: string | null
+          courier_notes?: string | null
+          courier_tracking?: string | null
           created_at?: string
           customer_address?: string | null
           customer_name?: string
@@ -154,6 +165,7 @@ export type Database = {
           order_number?: string | null
           order_status?: string
           payment_method?: string
+          payment_state?: string
           payment_status?: string
           sale_channel?: string
           shipping_cost?: number
@@ -210,6 +222,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      pos_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          order_id: string | null
+          product_id: string | null
+          rating: number
+          seller_id: string
+          updated_at: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          order_id?: string | null
+          product_id?: string | null
+          rating: number
+          seller_id: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          order_id?: string | null
+          product_id?: string | null
+          rating?: number
+          seller_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_feedback_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_images: {
         Row: {
@@ -321,6 +380,7 @@ export type Database = {
       }
       products: {
         Row: {
+          barcode: string | null
           base_price: number
           category: string
           created_at: string
@@ -342,6 +402,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          barcode?: string | null
           base_price: number
           category: string
           created_at?: string
@@ -363,6 +424,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          barcode?: string | null
           base_price?: number
           category?: string
           created_at?: string
@@ -608,6 +670,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      decrement_variant_stock: {
+        Args: { _qty: number; _variant_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
