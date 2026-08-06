@@ -208,23 +208,6 @@ const CheckoutForm: React.FC = () => {
     }
   };
 
-  const legacyGenerateBillImage = async (): Promise<string | null> => {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    if (billRef.current) {
-      try {
-        const canvas = await html2canvas(billRef.current, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-        });
-        return canvas.toDataURL('image/png');
-      } catch (error) {
-        console.error('Error generating bill image:', error);
-      }
-    }
-    return null;
-  };
-
   const downloadBill = async () => {
     const imageUrl = billImageUrl || await generateBillImage();
     if (imageUrl) {
