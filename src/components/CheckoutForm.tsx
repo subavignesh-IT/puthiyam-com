@@ -15,6 +15,8 @@ import { Phone, CreditCard, Banknote, Share2, Download, MessageCircle } from 'lu
 import QRCodePayment from './QRCodePayment';
 import CheckoutBillImage from './CheckoutBillImage';
 import { generateOrderId, getOrderIdForDisplay } from '@/utils/orderIdGenerator';
+import { sendBillToCustomer, buildThankYouMessage } from '@/lib/billDelivery';
+import { decrementStock } from '@/lib/stock';
 
 const CheckoutForm: React.FC = () => {
   const { items, getTotal, getShippingCost, clearCart, getItemEffectivePrice } = useCart();
@@ -95,7 +97,9 @@ const CheckoutForm: React.FC = () => {
         delivery_type: deliveryType,
         payment_method: paymentMethod,
         payment_status: paymentMethod === 'online' ? 'paid' : 'pending',
+        payment_state: paymentMethod === 'online' ? 'paid' : 'pay_later',
         order_status: 'pending',
+        courier_name: deliveryType === 'shipping' ? 'Home Delivery' : null,
         order_number: orderId,
         items: items.map(item => {
           const effPrice = getItemEffectivePrice(item);
@@ -132,6 +136,9 @@ const CheckoutForm: React.FC = () => {
           .eq('user_id', user!.id);
       }
 
+      // Update inventory for the purchased variants
+      await updateInventory();
+
       return orderId;
     } catch (error) {
       console.error('Error saving order:', error);
@@ -140,6 +147,68 @@ const CheckoutForm: React.FC = () => {
   };
 
   const generateBillImage = async (): Promise<string | null> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    if (billRef.current) {
+      try {
+        const canvas = await html2canvas(billRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+        return canvas.toDataURL('image/png');
+      } catch (error) {
+        console.error('Error generating bill image:', error);
+      }
+    }
+    return null;
+  };
+
+  /** Reduces stock for each purchased variant (skipped for unlimited-stock products). */
+  const updateInventory = async () => {
+    try {
+      const productIds = Array.from(new Set(items.map(i => i.id)));
+      if (!productIds.length) return;
+      const { data: variants } = await supabase
+        .from('product_variants')
+        .select('id, product_id, quantity')
+        .in('product_id', productIds);
+      const lines = items.map(item => {
+        const label = item.selectedVariant?.weight || '';
+        const num = parseFloat(label);
+        const match = (variants as any[] || []).find(
+          v => v.product_id === item.id && (isNaN(num) ? true : Number(v.quantity) === num)
+        );
+        return { variantId: match?.id, quantity: item.quantity };
+      });
+      await decrementStock(lines);
+    } catch (e) {
+      console.error('Inventory update failed', e);
+    }
+  };
+
+  /** Sends the bill + thank-you message to the customer automatically (WhatsApp → SMS fallback). */
+  const autoSendBillToCustomer = async (orderId: string, imageUrl: string | null) => {
+    const res = await sendBillToCustomer({
+      phone: formData.phone,
+      message: buildThankYouMessage({
+        orderNumber: orderId,
+        customerName: formData.name || 'Customer',
+        total: grandTotal,
+        paid: paymentMethod === 'online',
+      }),
+      imageDataUrl: imageUrl,
+      orderNumber: orderId,
+    });
+    if (res.channel === 'whatsapp') {
+      toast({ title: 'Bill sent on WhatsApp', description: 'A thank-you message with the bill was delivered.' });
+    } else if (res.channel === 'sms') {
+      toast({ title: 'Bill sent by SMS', description: 'WhatsApp delivery failed, so we texted the bill link.' });
+    } else {
+      toast({ title: 'Automatic bill send failed', description: 'Use the Share Bill button to send it manually.', variant: 'destructive' });
+    }
+  };
+
+  const legacyGenerateBillImage = async (): Promise<string | null> => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     if (billRef.current) {
