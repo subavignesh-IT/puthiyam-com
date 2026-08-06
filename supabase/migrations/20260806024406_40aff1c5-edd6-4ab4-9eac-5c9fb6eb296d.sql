@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.decrement_variant_stock(uuid, integer) FROM anon;
