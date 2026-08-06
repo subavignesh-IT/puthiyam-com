@@ -298,7 +298,7 @@ const CheckoutForm: React.FC = () => {
     setShowQR(false);
 
     // Save order to database
-    await saveOrderToDatabase(true);
+    const orderId = await saveOrderToDatabase(true);
 
     // Update customer defaults for next order
     updateDefaults({
@@ -321,6 +321,9 @@ const CheckoutForm: React.FC = () => {
 
     // Auto-open WhatsApp share so the bill is ready to send to seller
     await shareImageToWhatsApp(true);
+
+    // Automatically send the bill + thank-you message to the customer
+    if (orderId) await autoSendBillToCustomer(orderId, imageUrl);
 
     // Persist last order for 5-min download banner on cart
     persistLastOrder(imageUrl);
@@ -334,7 +337,7 @@ const CheckoutForm: React.FC = () => {
     setPaymentComplete(true);
 
     // Save order to database
-    await saveOrderToDatabase(false);
+    const orderId = await saveOrderToDatabase(false);
 
     // Update customer defaults for next order
     updateDefaults({
@@ -357,6 +360,9 @@ const CheckoutForm: React.FC = () => {
 
     // Auto-open WhatsApp share so the bill is ready to send to seller
     await shareImageToWhatsApp(true);
+
+    // Automatically send the bill + thank-you message to the customer
+    if (orderId) await autoSendBillToCustomer(orderId, imageUrl);
 
     // Persist last order for 5-min download banner on cart
     persistLastOrder(imageUrl);
