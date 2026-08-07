@@ -101,21 +101,21 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<'product' | 'cart' | 'customer'>('product');
   const [scanOpen, setScanOpen] = useState(false);
+  const [showCostPrices, setShowCostPrices] = useState(false);
 
-  // Invoice preview / feedback
+  // Invoice preview
   const [previewOpen, setPreviewOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [billDataUrl, setBillDataUrl] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState<string>('');
-  const [feedback, setFeedback] = useState<Record<string, { rating: number; comment: string }>>({});
-  const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [ratingUrl, setRatingUrl] = useState<string | null>(null);
 
   const billRef = useRef<HTMLDivElement>(null);
 
   const loadProducts = async () => {
     const [{ data: p }, { data: v }, { data: w }, { data: imgs }, { data: prof }, { data: pc }] = await Promise.all([
-      supabase.from('products').select('id, name, category, base_price, delivery_charge, free_delivery_quantity, unlimited_stock, barcode').eq('seller_id', sellerId).eq('is_active', true),
-      supabase.from('product_variants').select('id, product_id, quantity, price, is_default, stock_quantity'),
+      supabase.from('products').select('id, name, category, base_price, purchase_price, delivery_charge, free_delivery_quantity, unlimited_stock, barcode').eq('seller_id', sellerId).eq('is_active', true),
+      supabase.from('product_variants').select('id, product_id, quantity, price, is_default, stock_quantity, wholesale_price'),
       supabase.from('product_wholesale_tiers').select('product_id, min_quantity, price'),
       supabase.from('product_images').select('product_id, image_url, is_primary'),
       supabase.from('profiles').select('upi_id, full_name').eq('user_id', sellerId).maybeSingle(),
@@ -129,6 +129,7 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
         name: pr.name,
         category: pr.category,
         base_price: pr.base_price,
+        purchase_price: pr.purchase_price,
         barcode: pr.barcode,
         unlimited_stock: pr.unlimited_stock,
         image: img?.image_url,
