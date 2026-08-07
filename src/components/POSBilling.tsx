@@ -835,31 +835,18 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
                 <Button variant="outline" onClick={shareJpg} disabled={!billDataUrl}><Share2 className="w-4 h-4 mr-2" /> Send to WhatsApp</Button>
               </div>
 
-              <div className="rounded-lg border p-3 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-2"><Star className="w-4 h-4 text-amber-500" /> Customer feedback</p>
-                {cart.map((l) => {
-                  const f = feedback[l.productId] || { rating: 0, comment: '' };
-                  return (
-                    <div key={l.productId} className="space-y-1 border-b last:border-b-0 pb-2 last:pb-0">
-                      <p className="text-sm font-medium truncate">{l.name}</p>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <button key={n} type="button" onClick={() => setFeedback(p => ({ ...p, [l.productId]: { ...f, rating: n } }))}
-                            className="transition-transform active:scale-90">
-                            <Star className={`w-5 h-5 ${n <= f.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
-                          </button>
-                        ))}
-                      </div>
-                      <Input placeholder="Comment (optional)" value={f.comment}
-                        onChange={(e) => setFeedback(p => ({ ...p, [l.productId]: { ...f, comment: e.target.value } }))}
-                        className="h-9 text-sm" />
-                    </div>
-                  );
-                })}
-                <Button size="sm" onClick={saveFeedback} disabled={feedbackSaving} className="w-full">
-                  {feedbackSaving ? 'Saving…' : 'Save feedback with invoice'}
-                </Button>
-              </div>
+              {ratingUrl && (
+                <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-primary" /> Customer rating link
+                  </p>
+                  <p className="text-xs text-muted-foreground break-all">{ratingUrl}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Shared automatically with the bill and printed as a QR code on the invoice.
+                  </p>
+                  <Button size="sm" variant="outline" className="w-full" onClick={copyRatingLink}>Copy link</Button>
+                </div>
+              )}
             </div>
           </div>
 
