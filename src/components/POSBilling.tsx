@@ -11,11 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Minus, Trash2, Download, Share2, QrCode, Search, UserPlus, ShoppingCart,
-  Truck, ScanLine, Package, User as UserIcon, Star, CheckCircle2, Clock, MessageCircle,
+  Truck, ScanLine, Package, User as UserIcon, CheckCircle2, Clock, MessageCircle,
+  Eye, EyeOff, Link2,
 } from 'lucide-react';
 import { generateOrderId } from '@/utils/orderIdGenerator';
 import { toJpeg } from 'html-to-image';
-import OrderBillImage from '@/components/OrderBillImage';
+import InvoiceBill from '@/components/InvoiceBill';
 import BarcodeScannerDialog from '@/components/BarcodeScannerDialog';
 import { sendBillToCustomer, buildThankYouMessage, openWhatsAppFallback } from '@/lib/billDelivery';
 import { decrementStock, stockState } from '@/lib/stock';
@@ -25,16 +26,18 @@ const DEFAULT_UPI_ID = 'kathaiahkarthik@okhdfcbank';
 interface POSBillingProps { sellerId: string }
 
 interface Variant { id: string; quantity: number; price: number; is_default?: boolean | null; stock_quantity?: number }
+interface VariantEx extends Variant { wholesale_price?: number | null }
 interface WholesaleTier { min_quantity: number; price: number }
 interface ProductLite {
   id: string;
   name: string;
   category: string;
   base_price: number;
+  purchase_price?: number | null;
   barcode?: string | null;
   unlimited_stock?: boolean;
   image?: string;
-  variants: Variant[];
+  variants: VariantEx[];
   wholesale: WholesaleTier[];
   delivery_charge?: number;
   free_delivery_quantity?: number;
@@ -47,6 +50,8 @@ interface CartLine {
   unitPrice: number;
   effectivePrice: number;
   wholesaleApplied?: number;
+  wholesalePrice?: number | null;
+  purchasePrice?: number | null;
   deliveryCharge?: number;
   freeDeliveryQty?: number;
 }
