@@ -292,7 +292,7 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     setCustomerAddress(''); setAddressError(''); setManualCourier(''); setDeliveryType('self-pickup');
     setCourierName(''); setCourierTracking(''); setCourierNotes('');
     setPaymentState('paid'); setCustSearch(''); setTab('product');
-    setFeedback({}); setBillDataUrl(null); setDeliveryStatus('');
+    setBillDataUrl(null); setDeliveryStatus(''); setRatingUrl(null); setLastOrder(null);
   };
 
   const buildBillItems = () => cart.map(l => ({
