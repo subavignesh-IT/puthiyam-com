@@ -25,36 +25,6 @@ export const barcodeDataUrl = (code: string, opts?: { width?: number; height?: n
   }
 };
 
-/** Full 1 x 2.5 inch sticker (product name + barcode + code) as a PNG data URL. */
-export const labelDataUrl = (code: string, name: string, price?: number): string => {
-  const w = Math.round(LABEL_W_IN * DPI);
-  const h = Math.round(LABEL_H_IN * DPI);
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, w, h);
-
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 34px Arial';
-  ctx.textBaseline = 'top';
-  const title = name.length > 30 ? `${name.slice(0, 29)}…` : name;
-  ctx.fillText(title, 12, 10);
-  if (typeof price === 'number' && price > 0) {
-    ctx.font = 'bold 30px Arial';
-    const label = `Rs.${price}`;
-    ctx.fillText(label, w - ctx.measureText(label).width - 12, 10);
-  }
-
-  const bc = new Image();
-  const bcUrl = barcodeDataUrl(code, { width: 3, height: 150, displayValue: true });
-  // Draw synchronously is impossible for images; caller uses labelDataUrlAsync instead.
-  void bc; void bcUrl;
-  return canvas.toDataURL('image/png');
-};
-
 /** Async version that composes the full sticker with the barcode drawn in. */
 export const labelDataUrlAsync = (code: string, name: string, price?: number): Promise<string> =>
   new Promise((resolve) => {
