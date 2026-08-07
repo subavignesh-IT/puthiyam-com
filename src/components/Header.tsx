@@ -4,6 +4,7 @@ import { Search, User, LogOut, ClipboardList, ChevronDown, Store, Shield } from 
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import UIStyleSwitcher from '@/components/UIStyleSwitcher';
 import TrendingPopup from '@/components/TrendingPopup';
+import ImageSearchDialog from '@/components/ImageSearchDialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -107,10 +108,11 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 <Input
                   type="text"
                   placeholder="Search products..."
-                  className="pl-10 bg-muted/50 border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                  className="pl-10 pr-10 bg-muted/50 border-0 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                   value={searchQuery}
                   onChange={(e) => onSearch(e.target.value)}
                 />
+                <ImageSearchDialog onResult={onSearch} />
               </div>
             </div>
           )}
