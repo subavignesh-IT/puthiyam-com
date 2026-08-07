@@ -396,6 +396,7 @@ export type Database = {
           measurement_unit: string
           name: string
           packing_type: string | null
+          purchase_price: number | null
           sale_end_time: string | null
           seller_id: string
           unlimited_stock: boolean
@@ -418,6 +419,7 @@ export type Database = {
           measurement_unit?: string
           name: string
           packing_type?: string | null
+          purchase_price?: number | null
           sale_end_time?: string | null
           seller_id: string
           unlimited_stock?: boolean
@@ -440,6 +442,7 @@ export type Database = {
           measurement_unit?: string
           name?: string
           packing_type?: string | null
+          purchase_price?: number | null
           sale_end_time?: string | null
           seller_id?: string
           unlimited_stock?: boolean
@@ -667,19 +670,60 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      reviews_public: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string | null
+          image_url: string | null
+          product_id: string | null
+          rating: number | null
+          user_name: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          product_id?: string | null
+          rating?: number | null
+          user_name?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          product_id?: string | null
+          rating?: number | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       decrement_variant_stock: {
         Args: { _qty: number; _variant_id: string }
         Returns: undefined
       }
+      get_order_for_rating: { Args: { _order_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      submit_pos_feedback: {
+        Args: {
+          _comment?: string
+          _customer_name?: string
+          _customer_phone?: string
+          _order_id: string
+          _product_id: string
+          _rating: number
+        }
+        Returns: undefined
       }
     }
     Enums: {

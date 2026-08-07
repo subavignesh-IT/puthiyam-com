@@ -11,11 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Minus, Trash2, Download, Share2, QrCode, Search, UserPlus, ShoppingCart,
-  Truck, ScanLine, Package, User as UserIcon, Star, CheckCircle2, Clock, MessageCircle,
+  Truck, ScanLine, Package, User as UserIcon, CheckCircle2, Clock, MessageCircle,
+  Eye, EyeOff, Link2,
 } from 'lucide-react';
 import { generateOrderId } from '@/utils/orderIdGenerator';
 import { toJpeg } from 'html-to-image';
-import OrderBillImage from '@/components/OrderBillImage';
+import InvoiceBill from '@/components/InvoiceBill';
 import BarcodeScannerDialog from '@/components/BarcodeScannerDialog';
 import { sendBillToCustomer, buildThankYouMessage, openWhatsAppFallback } from '@/lib/billDelivery';
 import { decrementStock, stockState } from '@/lib/stock';
@@ -25,16 +26,18 @@ const DEFAULT_UPI_ID = 'kathaiahkarthik@okhdfcbank';
 interface POSBillingProps { sellerId: string }
 
 interface Variant { id: string; quantity: number; price: number; is_default?: boolean | null; stock_quantity?: number }
+interface VariantEx extends Variant { wholesale_price?: number | null }
 interface WholesaleTier { min_quantity: number; price: number }
 interface ProductLite {
   id: string;
   name: string;
   category: string;
   base_price: number;
+  purchase_price?: number | null;
   barcode?: string | null;
   unlimited_stock?: boolean;
   image?: string;
-  variants: Variant[];
+  variants: VariantEx[];
   wholesale: WholesaleTier[];
   delivery_charge?: number;
   free_delivery_quantity?: number;
@@ -47,6 +50,8 @@ interface CartLine {
   unitPrice: number;
   effectivePrice: number;
   wholesaleApplied?: number;
+  wholesalePrice?: number | null;
+  purchasePrice?: number | null;
   deliveryCharge?: number;
   freeDeliveryQty?: number;
 }
@@ -96,21 +101,21 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<'product' | 'cart' | 'customer'>('product');
   const [scanOpen, setScanOpen] = useState(false);
+  const [showCostPrices, setShowCostPrices] = useState(false);
 
-  // Invoice preview / feedback
+  // Invoice preview
   const [previewOpen, setPreviewOpen] = useState(false);
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [billDataUrl, setBillDataUrl] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState<string>('');
-  const [feedback, setFeedback] = useState<Record<string, { rating: number; comment: string }>>({});
-  const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [ratingUrl, setRatingUrl] = useState<string | null>(null);
 
   const billRef = useRef<HTMLDivElement>(null);
 
   const loadProducts = async () => {
     const [{ data: p }, { data: v }, { data: w }, { data: imgs }, { data: prof }, { data: pc }] = await Promise.all([
-      supabase.from('products').select('id, name, category, base_price, delivery_charge, free_delivery_quantity, unlimited_stock, barcode').eq('seller_id', sellerId).eq('is_active', true),
-      supabase.from('product_variants').select('id, product_id, quantity, price, is_default, stock_quantity'),
+      supabase.from('products').select('id, name, category, base_price, purchase_price, delivery_charge, free_delivery_quantity, unlimited_stock, barcode').eq('seller_id', sellerId).eq('is_active', true),
+      supabase.from('product_variants').select('id, product_id, quantity, price, is_default, stock_quantity, wholesale_price'),
       supabase.from('product_wholesale_tiers').select('product_id, min_quantity, price'),
       supabase.from('product_images').select('product_id, image_url, is_primary'),
       supabase.from('profiles').select('upi_id, full_name').eq('user_id', sellerId).maybeSingle(),
@@ -124,6 +129,7 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
         name: pr.name,
         category: pr.category,
         base_price: pr.base_price,
+        purchase_price: pr.purchase_price,
         barcode: pr.barcode,
         unlimited_stock: pr.unlimited_stock,
         image: img?.image_url,
@@ -170,6 +176,8 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     setCart(prev => [...prev, {
       productId: p.id, name: p.name, variant: v, quantity: 1, unitPrice: unit,
       effectivePrice: ws.price, wholesaleApplied: ws.wholesale,
+      wholesalePrice: (v as VariantEx | undefined)?.wholesale_price ?? null,
+      purchasePrice: p.purchase_price ?? null,
       deliveryCharge: p.delivery_charge || 0, freeDeliveryQty: p.free_delivery_quantity || 0,
     }]);
   };
@@ -286,7 +294,7 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     setCustomerAddress(''); setAddressError(''); setManualCourier(''); setDeliveryType('self-pickup');
     setCourierName(''); setCourierTracking(''); setCourierNotes('');
     setPaymentState('paid'); setCustSearch(''); setTab('product');
-    setFeedback({}); setBillDataUrl(null); setDeliveryStatus('');
+    setBillDataUrl(null); setDeliveryStatus(''); setRatingUrl(null); setLastOrder(null);
   };
 
   const buildBillItems = () => cart.map(l => ({
@@ -357,6 +365,8 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     await decrementStock(cart.map(l => ({ variantId: l.variant?.id, quantity: l.quantity })));
 
     setLastOrder({ ...data, paymentMode });
+    const link = `${window.location.origin}/#/rate/${(data as any).id}`;
+    setRatingUrl(link);
     await new Promise(r => setTimeout(r, 150));
     const dataUrl = await generateJpg();
     setBillDataUrl(dataUrl);
@@ -368,7 +378,7 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     setDeliveryStatus('Sending bill to customer…');
     const res = await sendBillToCustomer({
       phone: customerPhone,
-      message: buildThankYouMessage({ orderNumber, customerName: customerName || 'Customer', total: grandTotal, paid }),
+      message: `${buildThankYouMessage({ orderNumber, customerName: customerName || 'Customer', total: grandTotal, paid })}\nRate your order: ${link}`,
       imageDataUrl: dataUrl,
       orderNumber,
     });
@@ -405,24 +415,14 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     openWhatsAppFallback(customerPhone, `${text}\n(Bill image saved — please attach it here.)`);
   };
 
-  const saveFeedback = async () => {
-    const entries = Object.entries(feedback).filter(([, f]) => f.rating > 0);
-    if (!entries.length) { toast({ title: 'Add at least one rating' }); return; }
-    setFeedbackSaving(true);
-    const rows = entries.map(([productId, f]) => ({
-      order_id: lastOrder?.id ?? null,
-      product_id: productId,
-      seller_id: sellerId,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      rating: f.rating,
-      comment: f.comment || null,
-    }));
-    const { error } = await supabase.from('pos_feedback' as any).insert(rows as any);
-    setFeedbackSaving(false);
-    if (error) { toast({ title: 'Could not save feedback', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Feedback saved with the invoice' });
-    setFeedback({});
+  const copyRatingLink = async () => {
+    if (!ratingUrl) return;
+    try {
+      await navigator.clipboard.writeText(ratingUrl);
+      toast({ title: 'Rating link copied' });
+    } catch {
+      toast({ title: ratingUrl });
+    }
   };
 
   const closePreview = () => { setPreviewOpen(false); resetSession(); };
@@ -571,6 +571,16 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
                   )}
                 </div>
 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mb-2 h-9 text-xs"
+                  onClick={() => setShowCostPrices(v => !v)}
+                >
+                  {showCostPrices ? <EyeOff className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
+                  {showCostPrices ? 'Hide' : 'Show'} wholesale &amp; purchase price (seller only)
+                </Button>
+
                 {/* Payment status details */}
                 <div className={`mb-3 rounded-lg border p-3 ${paymentState === 'paid' ? 'border-green-500/40 bg-green-500/10' : 'border-amber-500/40 bg-amber-500/10'}`}>
                   <div className="flex items-center justify-between gap-2">
@@ -608,6 +618,12 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
                               {l.variant ? `${l.variant.quantity} • ` : ''}₹{l.effectivePrice}
                               {l.wholesaleApplied && <span className="ml-1 text-green-600 font-medium">(wholesale)</span>}
                             </p>
+                            {showCostPrices && (
+                              <p className="text-[11px] text-amber-600">
+                                {typeof l.wholesalePrice === 'number' ? `Wholesale ₹${l.wholesalePrice} • ` : ''}
+                                {typeof l.purchasePrice === 'number' ? `Purchase ₹${l.purchasePrice} • Margin ₹${((l.effectivePrice - l.purchasePrice) * l.quantity).toFixed(2)}` : 'No purchase price set'}
+                              </p>
+                            )}
                           </div>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => removeLine(i)}>
                             <Trash2 className="w-3.5 h-3.5" />
@@ -839,31 +855,18 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
                 <Button variant="outline" onClick={shareJpg} disabled={!billDataUrl}><Share2 className="w-4 h-4 mr-2" /> Send to WhatsApp</Button>
               </div>
 
-              <div className="rounded-lg border p-3 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-2"><Star className="w-4 h-4 text-amber-500" /> Customer feedback</p>
-                {cart.map((l) => {
-                  const f = feedback[l.productId] || { rating: 0, comment: '' };
-                  return (
-                    <div key={l.productId} className="space-y-1 border-b last:border-b-0 pb-2 last:pb-0">
-                      <p className="text-sm font-medium truncate">{l.name}</p>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <button key={n} type="button" onClick={() => setFeedback(p => ({ ...p, [l.productId]: { ...f, rating: n } }))}
-                            className="transition-transform active:scale-90">
-                            <Star className={`w-5 h-5 ${n <= f.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
-                          </button>
-                        ))}
-                      </div>
-                      <Input placeholder="Comment (optional)" value={f.comment}
-                        onChange={(e) => setFeedback(p => ({ ...p, [l.productId]: { ...f, comment: e.target.value } }))}
-                        className="h-9 text-sm" />
-                    </div>
-                  );
-                })}
-                <Button size="sm" onClick={saveFeedback} disabled={feedbackSaving} className="w-full">
-                  {feedbackSaving ? 'Saving…' : 'Save feedback with invoice'}
-                </Button>
-              </div>
+              {ratingUrl && (
+                <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-primary" /> Customer rating link
+                  </p>
+                  <p className="text-xs text-muted-foreground break-all">{ratingUrl}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Shared automatically with the bill and printed as a QR code on the invoice.
+                  </p>
+                  <Button size="sm" variant="outline" className="w-full" onClick={copyRatingLink}>Copy link</Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -875,21 +878,27 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
 
       {/* Hidden bill used for JPG capture */}
       <div style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', opacity: 0 }}>
-        <OrderBillImage
+        <InvoiceBill
           ref={billRef}
-          orderId={lastOrder?.order_number || 'DRAFT'}
+          invoiceNo={lastOrder?.order_number || 'DRAFT'}
+          date={new Date().toLocaleDateString('en-IN')}
           customerName={customerName}
           customerPhone={customerPhone}
           customerAddress={deliveryType === 'shipping' ? customerAddress : null}
-          deliveryType={deliveryType}
-          paymentMethod={paymentMode === 'upi' ? 'upi' : 'cod'}
-          paymentStatus={paymentState === 'paid' ? 'paid' : 'pending'}
-          orderStatus={deliveryType === 'shipping' ? 'processing' : 'delivered'}
-          items={buildBillItems()}
+          items={cart.map(l => ({
+            name: l.name,
+            quantity: l.quantity,
+            unit: l.variant ? String(l.variant.quantity) : 'Pcs',
+            price: l.effectivePrice,
+          }))}
           subtotal={subtotal}
           shippingCost={shippingCost}
           total={grandTotal}
-          createdAt={new Date().toISOString()}
+          received={paymentState === 'paid' ? grandTotal : 0}
+          paymentMode={paymentState === 'paid' ? (paymentMode === 'upi' ? 'UPI' : 'Cash') : 'Pay later'}
+          upiId={upiId}
+          payeeName={sellerName}
+          ratingUrl={ratingUrl}
         />
       </div>
     </div>
