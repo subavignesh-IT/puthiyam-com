@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Barcode, Save, Wand2, ScanLine, Search } from 'lucide-react';
+import { Barcode, Save, Wand2, ScanLine, Search, Printer, Download } from 'lucide-react';
 import BarcodeScannerDialog from '@/components/BarcodeScannerDialog';
+import { barcodeDataUrl, labelDataUrlAsync, printLabels } from '@/lib/barcodeImage';
 
 interface Row { id: string; name: string; category: string; barcode: string | null }
 
@@ -18,6 +19,7 @@ const BarcodeTab: React.FC<{ sellerId: string }> = ({ sellerId }) => {
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [scanFor, setScanFor] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
 
   const load = async () => {
     const { data } = await supabase
@@ -86,6 +88,39 @@ const BarcodeTab: React.FC<{ sellerId: string }> = ({ sellerId }) => {
 
   const assigned = rows.filter(r => (r.barcode || '').trim()).length;
 
+  const downloadLabel = async (r: Row) => {
+    const code = value(r).trim();
+    if (!code) { toast({ title: 'Add a barcode first', variant: 'destructive' }); return; }
+    const url = await labelDataUrlAsync(code, r.name);
+    if (!url) { toast({ title: 'Could not create the label', variant: 'destructive' }); return; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `label-${code}.png`;
+    a.click();
+    toast({ title: 'Label downloaded', description: '1 x 2.5 inch sticker ready to print' });
+  };
+
+  const printOne = async (r: Row) => {
+    const code = value(r).trim();
+    if (!code) { toast({ title: 'Add a barcode first', variant: 'destructive' }); return; }
+    const url = await labelDataUrlAsync(code, r.name);
+    if (url) printLabels([{ dataUrl: url, code }]);
+  };
+
+  const printAllAssigned = async () => {
+    const withCodes = filtered.filter(r => value(r).trim());
+    if (!withCodes.length) { toast({ title: 'No barcodes to print' }); return; }
+    setPrinting(true);
+    const labels: { dataUrl: string; code: string }[] = [];
+    for (const r of withCodes) {
+      const code = value(r).trim();
+      const url = await labelDataUrlAsync(code, r.name);
+      if (url) labels.push({ dataUrl: url, code });
+    }
+    setPrinting(false);
+    printLabels(labels);
+  };
+
   return (
     <Card>
       <CardHeader className="space-y-3">
@@ -101,6 +136,9 @@ const BarcodeTab: React.FC<{ sellerId: string }> = ({ sellerId }) => {
           <Button variant="outline" onClick={autoGenerateBlanks} className="h-10">
             <Wand2 className="w-4 h-4 mr-2" /> Auto-generate blanks
           </Button>
+          <Button variant="outline" onClick={printAllAssigned} disabled={printing} className="h-10">
+            <Printer className="w-4 h-4 mr-2" /> {printing ? 'Preparing…' : 'Print all labels'}
+          </Button>
           <Button onClick={saveAll} disabled={saving} className="h-10">
             <Save className="w-4 h-4 mr-2" /> {saving ? 'Saving…' : 'Save all'}
           </Button>
@@ -114,6 +152,7 @@ const BarcodeTab: React.FC<{ sellerId: string }> = ({ sellerId }) => {
             {filtered.map(r => {
               const v = value(r);
               const dupe = !!v.trim() && duplicates.has(v.trim());
+              const preview = v.trim() ? barcodeDataUrl(v.trim(), { width: 2, height: 90 }) : '';
               return (
                 <div key={r.id} className="rounded-lg border p-3 space-y-2 bg-card">
                   <div className="flex items-start justify-between gap-2">
@@ -142,6 +181,21 @@ const BarcodeTab: React.FC<{ sellerId: string }> = ({ sellerId }) => {
                     </Button>
                   </div>
                   {dupe && <p className="text-[11px] text-destructive">This barcode is already used by another product.</p>}
+                  {preview && (
+                    <div className="space-y-2">
+                      <div className="rounded-md bg-white p-3 flex items-center justify-center">
+                        <img src={preview} alt={`Barcode ${v}`} className="w-full max-w-[320px] h-auto" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => downloadLabel(r)}>
+                          <Download className="w-4 h-4 mr-1" /> Label PNG
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => printOne(r)}>
+                          <Printer className="w-4 h-4 mr-1" /> Print 1"x2.5"
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
