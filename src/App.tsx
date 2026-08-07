@@ -22,6 +22,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import SellerSignup from "./pages/SellerSignup";
 import POS from "./pages/POS";
+import RateOrder from "./pages/RateOrder";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/trending" element={<Trending />} />
               <Route path="/seller" element={<SellerDashboard />} />
               <Route path="/pos" element={<POS />} />
+              <Route path="/rate/:orderId" element={<RateOrder />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/seller-login" element={<SellerLogin />} />
               <Route path="/seller-signup" element={<SellerSignup />} />
