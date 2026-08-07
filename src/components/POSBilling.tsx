@@ -176,6 +176,8 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     setCart(prev => [...prev, {
       productId: p.id, name: p.name, variant: v, quantity: 1, unitPrice: unit,
       effectivePrice: ws.price, wholesaleApplied: ws.wholesale,
+      wholesalePrice: (v as VariantEx | undefined)?.wholesale_price ?? null,
+      purchasePrice: p.purchase_price ?? null,
       deliveryCharge: p.delivery_charge || 0, freeDeliveryQty: p.free_delivery_quantity || 0,
     }]);
   };
@@ -569,6 +571,16 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
                   )}
                 </div>
 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mb-2 h-9 text-xs"
+                  onClick={() => setShowCostPrices(v => !v)}
+                >
+                  {showCostPrices ? <EyeOff className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
+                  {showCostPrices ? 'Hide' : 'Show'} wholesale &amp; purchase price (seller only)
+                </Button>
+
                 {/* Payment status details */}
                 <div className={`mb-3 rounded-lg border p-3 ${paymentState === 'paid' ? 'border-green-500/40 bg-green-500/10' : 'border-amber-500/40 bg-amber-500/10'}`}>
                   <div className="flex items-center justify-between gap-2">
@@ -606,6 +618,12 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
                               {l.variant ? `${l.variant.quantity} • ` : ''}₹{l.effectivePrice}
                               {l.wholesaleApplied && <span className="ml-1 text-green-600 font-medium">(wholesale)</span>}
                             </p>
+                            {showCostPrices && (
+                              <p className="text-[11px] text-amber-600">
+                                {typeof l.wholesalePrice === 'number' ? `Wholesale ₹${l.wholesalePrice} • ` : ''}
+                                {typeof l.purchasePrice === 'number' ? `Purchase ₹${l.purchasePrice} • Margin ₹${((l.effectivePrice - l.purchasePrice) * l.quantity).toFixed(2)}` : 'No purchase price set'}
+                              </p>
+                            )}
                           </div>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => removeLine(i)}>
                             <Trash2 className="w-3.5 h-3.5" />
