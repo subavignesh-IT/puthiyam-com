@@ -411,24 +411,14 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     openWhatsAppFallback(customerPhone, `${text}\n(Bill image saved — please attach it here.)`);
   };
 
-  const saveFeedback = async () => {
-    const entries = Object.entries(feedback).filter(([, f]) => f.rating > 0);
-    if (!entries.length) { toast({ title: 'Add at least one rating' }); return; }
-    setFeedbackSaving(true);
-    const rows = entries.map(([productId, f]) => ({
-      order_id: lastOrder?.id ?? null,
-      product_id: productId,
-      seller_id: sellerId,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      rating: f.rating,
-      comment: f.comment || null,
-    }));
-    const { error } = await supabase.from('pos_feedback' as any).insert(rows as any);
-    setFeedbackSaving(false);
-    if (error) { toast({ title: 'Could not save feedback', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Feedback saved with the invoice' });
-    setFeedback({});
+  const copyRatingLink = async () => {
+    if (!ratingUrl) return;
+    try {
+      await navigator.clipboard.writeText(ratingUrl);
+      toast({ title: 'Rating link copied' });
+    } catch {
+      toast({ title: ratingUrl });
+    }
   };
 
   const closePreview = () => { setPreviewOpen(false); resetSession(); };
