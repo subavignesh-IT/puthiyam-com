@@ -363,6 +363,8 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     await decrementStock(cart.map(l => ({ variantId: l.variant?.id, quantity: l.quantity })));
 
     setLastOrder({ ...data, paymentMode });
+    const link = `${window.location.origin}/#/rate/${(data as any).id}`;
+    setRatingUrl(link);
     await new Promise(r => setTimeout(r, 150));
     const dataUrl = await generateJpg();
     setBillDataUrl(dataUrl);
@@ -374,7 +376,7 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
     setDeliveryStatus('Sending bill to customer…');
     const res = await sendBillToCustomer({
       phone: customerPhone,
-      message: buildThankYouMessage({ orderNumber, customerName: customerName || 'Customer', total: grandTotal, paid }),
+      message: `${buildThankYouMessage({ orderNumber, customerName: customerName || 'Customer', total: grandTotal, paid })}\nRate your order: ${link}`,
       imageDataUrl: dataUrl,
       orderNumber,
     });
