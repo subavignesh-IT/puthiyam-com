@@ -858,21 +858,27 @@ const POSBilling: React.FC<POSBillingProps> = ({ sellerId }) => {
 
       {/* Hidden bill used for JPG capture */}
       <div style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', opacity: 0 }}>
-        <OrderBillImage
+        <InvoiceBill
           ref={billRef}
-          orderId={lastOrder?.order_number || 'DRAFT'}
+          invoiceNo={lastOrder?.order_number || 'DRAFT'}
+          date={new Date().toLocaleDateString('en-IN')}
           customerName={customerName}
           customerPhone={customerPhone}
           customerAddress={deliveryType === 'shipping' ? customerAddress : null}
-          deliveryType={deliveryType}
-          paymentMethod={paymentMode === 'upi' ? 'upi' : 'cod'}
-          paymentStatus={paymentState === 'paid' ? 'paid' : 'pending'}
-          orderStatus={deliveryType === 'shipping' ? 'processing' : 'delivered'}
-          items={buildBillItems()}
+          items={cart.map(l => ({
+            name: l.name,
+            quantity: l.quantity,
+            unit: l.variant ? String(l.variant.quantity) : 'Pcs',
+            price: l.effectivePrice,
+          }))}
           subtotal={subtotal}
           shippingCost={shippingCost}
           total={grandTotal}
-          createdAt={new Date().toISOString()}
+          received={paymentState === 'paid' ? grandTotal : 0}
+          paymentMode={paymentState === 'paid' ? (paymentMode === 'upi' ? 'UPI' : 'Cash') : 'Pay later'}
+          upiId={upiId}
+          payeeName={sellerName}
+          ratingUrl={ratingUrl}
         />
       </div>
     </div>
