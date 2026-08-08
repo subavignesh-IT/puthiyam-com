@@ -25,6 +25,9 @@ export interface InvoiceBillProps {
   payeeName?: string;
   ratingUrl?: string | null;
   loyaltyPoints?: number | null;
+  gstin?: string | null;
+  gstRate?: number | null;
+  gstAmount?: number | null;
   contactPhone?: string;
   contactEmail?: string;
   terms?: string;
@@ -54,6 +57,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>((props, ref) =>
     invoiceNo, date, customerName, customerPhone, customerAddress, items,
     subtotal, shippingCost = 0, total, received = 0, paymentMode,
     upiId, payeeName = 'PUTHIYAM PRODUCTS', ratingUrl, loyaltyPoints,
+    gstin, gstRate, gstAmount,
     contactPhone = '9361284773', contactEmail = 'puthiyamproduct@gmail.com',
     terms = 'Thank you for doing business with us.',
   } = props;
@@ -104,6 +108,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>((props, ref) =>
           borderBottomRightRadius: 44, minWidth: 380,
         }}>
           <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>PUTHIYAM_PRODUCTS</div>
+          {gstin ? <div style={{ fontSize: 11, marginTop: 4, opacity: 0.9 }}>GSTIN: {gstin}</div> : null}
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '10px 26px' }}>
           <div style={{ fontSize: 28, fontWeight: 400 }}>Bill of Supply</div>
@@ -212,6 +217,12 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>((props, ref) =>
               <tr><td style={sumLabel}>Sub Total</td><td style={sumValue}>{money(subtotal)}</td></tr>
               {shippingCost > 0 && (
                 <tr><td style={sumLabel}>Courier / Delivery</td><td style={sumValue}>{money(shippingCost)}</td></tr>
+              )}
+              {typeof gstAmount === 'number' && gstAmount > 0 && (
+                <tr>
+                  <td style={sumLabel}>GST{gstRate ? ` @ ${gstRate}%` : ''}</td>
+                  <td style={sumValue}>{money(gstAmount)}</td>
+                </tr>
               )}
               <tr>
                 <td style={{ ...sumLabel, background: RED, color: '#fff', fontWeight: 700 }}>Total</td>
