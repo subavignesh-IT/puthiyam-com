@@ -2,12 +2,24 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface StockLine { variantId?: string | null; quantity: number }
 
+export interface StockContext {
+  orderId?: string | null;
+  reason?: string;
+  saleChannel?: string | null;
+}
+
 /** Reduces variant stock after a successful checkout (skipped for unlimited-stock products). */
-export const decrementStock = async (lines: StockLine[]) => {
+export const decrementStock = async (lines: StockLine[], ctx: StockContext = {}) => {
   const valid = lines.filter(l => l.variantId && l.quantity > 0);
   await Promise.all(
     valid.map(l =>
-      (supabase.rpc as any)('decrement_variant_stock', { _variant_id: l.variantId, _qty: l.quantity })
+      (supabase.rpc as any)('decrement_variant_stock', {
+        _variant_id: l.variantId,
+        _qty: l.quantity,
+        _order_id: ctx.orderId ?? null,
+        _reason: ctx.reason ?? 'sale',
+        _sale_channel: ctx.saleChannel ?? null,
+      })
         .then(({ error }: any) => { if (error) console.error('stock update failed', error.message); })
     )
   );

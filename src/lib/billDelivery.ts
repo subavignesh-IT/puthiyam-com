@@ -1,5 +1,29 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface BillDeliveryRecord {
+  orderId?: string | null;
+  sellerId: string;
+  orderNumber?: string | null;
+  phone?: string | null;
+  channel: string;
+  status: 'sent' | 'failed' | 'pending';
+  error?: string | null;
+}
+
+/** Stores the outcome of a bill send so it can be audited and retried. */
+export const recordBillDelivery = async (rec: BillDeliveryRecord) => {
+  const { error } = await supabase.from('bill_deliveries').insert({
+    order_id: rec.orderId ?? null,
+    seller_id: rec.sellerId,
+    order_number: rec.orderNumber ?? null,
+    customer_phone: rec.phone ?? null,
+    channel: rec.channel,
+    status: rec.status,
+    error: rec.error ?? null,
+  } as any);
+  if (error) console.error('bill delivery log failed', error.message);
+};
+
 export interface BillDeliveryResult {
   channel: 'whatsapp' | 'sms' | 'none';
   mediaUrl?: string | null;

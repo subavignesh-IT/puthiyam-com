@@ -38,6 +38,56 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_deliveries: {
+        Row: {
+          attempts: number
+          channel: string
+          created_at: string
+          customer_phone: string | null
+          error: string | null
+          id: string
+          order_id: string | null
+          order_number: string | null
+          seller_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          channel?: string
+          created_at?: string
+          customer_phone?: string | null
+          error?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          seller_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          created_at?: string
+          customer_phone?: string | null
+          error?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          seller_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_deliveries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -53,6 +103,42 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      gst_settings: {
+        Row: {
+          created_at: string
+          default_rate: number
+          gstin: string | null
+          id: string
+          legal_name: string | null
+          place_of_supply: string | null
+          prices_include_gst: boolean
+          seller_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_rate?: number
+          gstin?: string | null
+          id?: string
+          legal_name?: string | null
+          place_of_supply?: string | null
+          prices_include_gst?: boolean
+          seller_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_rate?: number
+          gstin?: string | null
+          id?: string
+          legal_name?: string | null
+          place_of_supply?: string | null
+          prices_include_gst?: boolean
+          seller_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -113,6 +199,8 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delivery_type: string
+          gst_amount: number | null
+          gst_rate: number | null
           id: string
           items: Json
           loyalty_coupon_code: string | null
@@ -122,8 +210,10 @@ export type Database = {
           payment_state: string
           payment_status: string
           sale_channel: string
+          seller_gstin: string | null
           shipping_cost: number
           subtotal: number
+          taxable_value: number | null
           total: number
           user_id: string
         }
@@ -136,6 +226,8 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delivery_type: string
+          gst_amount?: number | null
+          gst_rate?: number | null
           id?: string
           items: Json
           loyalty_coupon_code?: string | null
@@ -145,8 +237,10 @@ export type Database = {
           payment_state?: string
           payment_status: string
           sale_channel?: string
+          seller_gstin?: string | null
           shipping_cost?: number
           subtotal: number
+          taxable_value?: number | null
           total: number
           user_id: string
         }
@@ -159,6 +253,8 @@ export type Database = {
           customer_name?: string
           customer_phone?: string
           delivery_type?: string
+          gst_amount?: number | null
+          gst_rate?: number | null
           id?: string
           items?: Json
           loyalty_coupon_code?: string | null
@@ -168,8 +264,10 @@ export type Database = {
           payment_state?: string
           payment_status?: string
           sale_channel?: string
+          seller_gstin?: string | null
           shipping_cost?: number
           subtotal?: number
+          taxable_value?: number | null
           total?: number
           user_id?: string
         }
@@ -307,6 +405,7 @@ export type Database = {
       }
       product_variants: {
         Row: {
+          barcode: string | null
           created_at: string
           id: string
           is_default: boolean | null
@@ -317,6 +416,7 @@ export type Database = {
           wholesale_price: number | null
         }
         Insert: {
+          barcode?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -327,6 +427,7 @@ export type Database = {
           wholesale_price?: number | null
         }
         Update: {
+          barcode?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -389,6 +490,8 @@ export type Database = {
           discount_amount: number
           discount_type: string | null
           free_delivery_quantity: number
+          gst_rate: number | null
+          hsn_code: string | null
           id: string
           is_active: boolean
           is_in_stock: boolean
@@ -412,6 +515,8 @@ export type Database = {
           discount_amount?: number
           discount_type?: string | null
           free_delivery_quantity?: number
+          gst_rate?: number | null
+          hsn_code?: string | null
           id?: string
           is_active?: boolean
           is_in_stock?: boolean
@@ -435,6 +540,8 @@ export type Database = {
           discount_amount?: number
           discount_type?: string | null
           free_delivery_quantity?: number
+          gst_rate?: number | null
+          hsn_code?: string | null
           id?: string
           is_active?: boolean
           is_in_stock?: boolean
@@ -647,6 +754,82 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_audit_log: {
+        Row: {
+          change_qty: number
+          created_at: string
+          created_by: string | null
+          id: string
+          order_id: string | null
+          order_number: string | null
+          product_id: string | null
+          product_name: string | null
+          reason: string
+          sale_channel: string | null
+          seller_id: string | null
+          stock_after: number | null
+          stock_before: number | null
+          variant_id: string | null
+          variant_label: string | null
+        }
+        Insert: {
+          change_qty: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          reason?: string
+          sale_channel?: string | null
+          seller_id?: string | null
+          stock_after?: number | null
+          stock_before?: number | null
+          variant_id?: string | null
+          variant_label?: string | null
+        }
+        Update: {
+          change_qty?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          reason?: string
+          sale_channel?: string | null
+          seller_id?: string | null
+          stock_after?: number | null
+          stock_before?: number | null
+          variant_id?: string | null
+          variant_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_audit_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_audit_log_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -702,10 +885,18 @@ export type Database = {
       }
     }
     Functions: {
-      decrement_variant_stock: {
-        Args: { _qty: number; _variant_id: string }
-        Returns: undefined
-      }
+      decrement_variant_stock:
+        | { Args: { _qty: number; _variant_id: string }; Returns: undefined }
+        | {
+            Args: {
+              _order_id?: string
+              _qty: number
+              _reason?: string
+              _sale_channel?: string
+              _variant_id: string
+            }
+            Returns: undefined
+          }
       get_order_for_rating: { Args: { _order_id: string }; Returns: Json }
       has_role: {
         Args: {

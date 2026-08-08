@@ -46,6 +46,9 @@ import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
 import SalesReportDashboard from '@/components/SalesReportDashboard';
 import OrderBillImage from '@/components/OrderBillImage';
 import BarcodeTab from '@/components/BarcodeTab';
+import StockAuditTab from '@/components/StockAuditTab';
+import GstTab from '@/components/GstTab';
+import CustomerHistoryTab from '@/components/CustomerHistoryTab';
 import { getOrderIdForDisplay } from '@/utils/orderIdGenerator';
 import html2canvas from 'html2canvas';
 
@@ -1491,6 +1494,18 @@ const SellerDashboard: React.FC = () => {
               <Barcode className="w-4 h-4" />
               <span className="hidden sm:inline">Barcodes</span>
             </TabsTrigger>
+            <TabsTrigger value="stock-audit" className="flex items-center gap-1 text-xs">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Stock Log</span>
+            </TabsTrigger>
+            <TabsTrigger value="gst" className="flex items-center gap-1 text-xs">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">GST</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-1 text-xs">
+              <Package className="w-4 h-4" />
+              <span className="hidden sm:inline">History</span>
+            </TabsTrigger>
             <TabsTrigger value="add" className="flex items-center gap-1 text-xs">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add New</span>
@@ -1532,6 +1547,21 @@ const SellerDashboard: React.FC = () => {
           {/* Barcode Management */}
           <TabsContent value="barcodes" className="space-y-4">
             {user && <BarcodeTab sellerId={user.id} />}
+          </TabsContent>
+
+          {/* Live stock audit log */}
+          <TabsContent value="stock-audit" className="space-y-4">
+            {user && <StockAuditTab sellerId={user.id} isAdmin={isAdmin} />}
+          </TabsContent>
+
+          {/* GST management */}
+          <TabsContent value="gst" className="space-y-4">
+            {user && <GstTab sellerId={user.id} />}
+          </TabsContent>
+
+          {/* Customer order history */}
+          <TabsContent value="history" className="space-y-4">
+            {user && <CustomerHistoryTab sellerId={user.id} isAdmin={isAdmin} />}
           </TabsContent>
 
           {/* Requested Products Tab */}
