@@ -83,3 +83,65 @@ export const printLabels = (labels: { dataUrl: string; code: string }[]) => {
   </body></html>`);
   win.document.close();
 };
+
+/**
+ * Prints many labels laid out as a grid on A4 sheets — 3 columns x 10 rows
+ * of 1" x 2.5" stickers per page.
+ */
+export const printLabelSheetA4 = (labels: { dataUrl: string; code: string }[]) => {
+  if (!labels.length) return;
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if (!win) return;
+  const imgs = labels
+    .map(l => `<div class="cell"><img src="${l.dataUrl}" alt="${l.code}" /></div>`)
+    .join('');
+  win.document.write(`<!doctype html><html><head><title>Barcode label sheet</title>
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    .sheet { display: grid; grid-template-columns: repeat(3, ${LABEL_W_IN}in); gap: 2mm; justify-content: center; }
+    .cell { width: ${LABEL_W_IN}in; height: ${LABEL_H_IN}in; overflow: hidden; border: 1px dashed #ccc; }
+    .cell img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    @media print { .cell { border: none; } }
+  </style></head><body><div class="sheet">${imgs}</div>
+  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
+  </body></html>`);
+  win.document.close();
+};
+
+/** Composes selected labels into A4-sheet PNG pages (30 labels per page). */
+export const labelSheetPages = async (labels: string[]): Promise<string[]> => {
+  const PER_PAGE = 30;
+  const COLS = 3;
+  const ROWS = 10;
+  const cw = Math.round(LABEL_W_IN * 150);
+  const ch = Math.round(LABEL_H_IN * 150);
+  const pages: string[] = [];
+  for (let start = 0; start < labels.length; start += PER_PAGE) {
+    const slice = labels.slice(start, start + PER_PAGE);
+    const canvas = document.createElement('canvas');
+    canvas.width = COLS * cw;
+    canvas.height = ROWS * ch;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) break;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < slice.length; i++) {
+      const img = await loadImage(slice[i]);
+      if (!img) continue;
+      const x = (i % COLS) * cw;
+      const y = Math.floor(i / COLS) * ch;
+      ctx.drawImage(img, x, y, cw, ch);
+    }
+    pages.push(canvas.toDataURL('image/jpeg', 0.92));
+  }
+  return pages;
+};
+
+const loadImage = (src: string): Promise<HTMLImageElement | null> =>
+  new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
