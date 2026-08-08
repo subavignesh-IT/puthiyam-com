@@ -46,6 +46,9 @@ import { DbProduct, DbProductVariant, DbProductImage } from '@/types/product';
 import SalesReportDashboard from '@/components/SalesReportDashboard';
 import OrderBillImage from '@/components/OrderBillImage';
 import BarcodeTab from '@/components/BarcodeTab';
+import StockAuditTab from '@/components/StockAuditTab';
+import GstTab from '@/components/GstTab';
+import CustomerHistoryTab from '@/components/CustomerHistoryTab';
 import { getOrderIdForDisplay } from '@/utils/orderIdGenerator';
 import html2canvas from 'html2canvas';
 
