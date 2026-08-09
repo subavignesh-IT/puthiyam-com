@@ -1138,6 +1138,9 @@ const SellerDashboard: React.FC = () => {
     setFreeDeliveryQuantity('0');
     setWholesaleTiers([]);
     setUnlimitedStock(false);
+    setPurchasePrice('');
+    setProductGstRate('');
+    setHsnCode('');
   };
 
   const handleUpdateProduct = async () => {
