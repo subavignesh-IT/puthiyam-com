@@ -104,6 +104,7 @@ const Index: React.FC = () => {
               weight: `${v.quantity}${product.measurement_unit}`,
               price: v.price,
               stockQuantity: v.stock_quantity,
+              isDefault: Boolean(v.is_default),
             })),
             isInStock: product.is_in_stock,
             isOnSale: isOnSale,
