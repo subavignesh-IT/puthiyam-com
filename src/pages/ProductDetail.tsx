@@ -7,6 +7,7 @@ import { useCart } from '@/context/CartContext';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
+import ProductCard from '@/components/ProductCard';
 import ImageSlideshow from '@/components/ImageSlideshow';
 import SaleCountdownTimer from '@/components/SaleCountdownTimer';
 import ShareButton from '@/components/ShareButton';
