@@ -69,6 +69,7 @@ const ProductDetail: React.FC = () => {
     if (id) {
       fetchProduct();
       fetchReviews();
+      fetchOtherProducts();
     }
   }, [id]);
 
