@@ -183,6 +183,50 @@ const ProductDetail: React.FC = () => {
     }
   };
 
+  const fetchOtherProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .neq('id', id)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    const list: Product[] = await Promise.all(
+      (data || []).map(async (p: any) => {
+        const [variantsRes, imagesRes] = await Promise.all([
+          supabase.from('product_variants').select('*').eq('product_id', p.id).order('price'),
+          supabase.from('product_images').select('*').eq('product_id', p.id).order('display_order'),
+        ]);
+        const variants = variantsRes.data || [];
+        const images = imagesRes.data || [];
+        const primary = images.find((i: any) => i.is_primary) || images[0];
+        const def = variants.find((v: any) => v.is_default) || variants[0];
+        return {
+          id: p.id,
+          name: p.name,
+          price: def?.price || p.base_price,
+          category: p.category,
+          image: primary?.image_url || '/placeholder.svg',
+          description: p.description || '',
+          rating: 0,
+          reviewCount: 0,
+          variants: variants.map((v: any) => ({
+            weight: `${v.quantity}${p.measurement_unit}`,
+            price: v.price,
+            stockQuantity: v.stock_quantity,
+            isDefault: Boolean(v.is_default),
+          })),
+          isInStock: p.is_in_stock,
+          isOnSale: false,
+          totalStock: variants.reduce((s: number, v: any) => s + (v.stock_quantity || 0), 0),
+          unlimitedStock: Boolean(p.unlimited_stock),
+        } as Product;
+      })
+    );
+    setOtherProducts(list);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
