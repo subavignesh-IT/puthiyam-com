@@ -122,9 +122,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             ) : (
               <span className="text-lg font-bold text-primary">₹{displayPrice}</span>
             )}
-            {product.variants && product.variants.length > 0 && (
+            {defaultVariant && (
               <span className="text-xs text-muted-foreground ml-1">
-                ({product.variants[0].weight})
+                ({defaultVariant.weight})
               </span>
             )}
           </div>
