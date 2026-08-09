@@ -54,6 +54,7 @@ const ProductDetail: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [saleExpired, setSaleExpired] = useState(false);
   const [totalStock, setTotalStock] = useState(0);
