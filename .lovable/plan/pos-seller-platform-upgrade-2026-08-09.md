@@ -7,6 +7,7 @@ Confirmed in the database: the seller requests table is completely empty, and on
 The seller signup writes the request immediately after sign-up, while the account is still unconfirmed and there is no active session, so the insert is rejected and the failure is only logged to the console.
 
 Fixes:
+
 - Write the seller request through a server-side function so it always lands, even before email confirmation, and show the real error to the user instead of swallowing it.
 - Add required company details to seller signup: shop/company name, GSTIN (optional), business address, city/district, pincode. Stored on the request and copied to the seller profile on approval.
 - Admin dashboard gets a searchable seller requests list (name, shop, phone, email) with Approve / Reject. Approve grants the seller role and marks the request approved.
@@ -44,6 +45,7 @@ Fixes:
 ## 7. Bill management tab (new seller dashboard tab)
 
 Both preset templates and full customisation:
+
 - Templates to start from, then per-section control: colours (header, table, totals), font family and size, logo, business details.
 - Terms & conditions text, footer note, UPI QR toggle and UPI ID, loyalty card block, and toggles for which fields appear (GSTIN, HSN, batch, MFD/EXP, delivery details, signature).
 - Live preview, multiple saved designs, one marked default.
@@ -52,6 +54,9 @@ Both preset templates and full customisation:
 ## 8. Delivery details on bills
 
 For home-delivery orders (POS and online), the bill shows:
+
+and it is downloadable in a size of 1/4 A4 sheet to stick on the courier boxes when the courier details button is clicked 
+
 ```text
 From: PUTHIYAM, 9361284773
       Paramakudi, Ramanathapuram - 623707
@@ -61,6 +66,7 @@ To:   <customer name, phone, address>
 ## 9. Customer tabs
 
 Two separate tabs on the seller dashboard:
+
 - Online customers - registered app buyers (read-only).
 - Offline customers - POS customers the seller adds, edits and removes manually.
 Where a phone number matches across both, the combined purchase history is shown.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -194,6 +194,27 @@ const SellerDashboard: React.FC = () => {
   const [freeDeliveryQuantity, setFreeDeliveryQuantity] = useState('0');
   const [wholesaleTiers, setWholesaleTiers] = useState<{ minQuantity: number; price: number }[]>([]);
   const [unlimitedStock, setUnlimitedStock] = useState(false);
+  const [purchasePrice, setPurchasePrice] = useState('');
+  const [productGstRate, setProductGstRate] = useState('');
+  const [hsnCode, setHsnCode] = useState('');
+
+  // Auto-calculated profit, margin and GST split for the product form
+  const costing = useMemo(() => {
+    const cost = parseFloat(purchasePrice);
+    if (!isFinite(cost) || cost <= 0) return null;
+    const def = variants.find(v => v.isDefault) || variants[0];
+    const selling = Number(def?.price) || 0;
+    if (!selling) return null;
+    const rate = parseFloat(productGstRate) || 0;
+    const taxable = rate > 0 ? selling / (1 + rate / 100) : selling;
+    return {
+      selling,
+      profit: selling - cost,
+      margin: (selling - cost) / selling * 100,
+      taxable,
+      gstAmount: selling - taxable,
+    };
+  }, [purchasePrice, productGstRate, variants]);
 
   // New category/packing type form
   const [newCategory, setNewCategory] = useState('');
@@ -1037,6 +1058,9 @@ const SellerDashboard: React.FC = () => {
           delivery_charge: parseFloat(deliveryCharge) || 0,
           free_delivery_quantity: parseInt(freeDeliveryQuantity) || 0,
           unlimited_stock: unlimitedStock,
+          purchase_price: purchasePrice === '' ? null : parseFloat(purchasePrice),
+          gst_rate: productGstRate === '' ? null : parseFloat(productGstRate),
+          hsn_code: hsnCode || null,
         } as any)
         .select()
         .single();
@@ -1132,6 +1156,9 @@ const SellerDashboard: React.FC = () => {
     setFreeDeliveryQuantity('0');
     setWholesaleTiers([]);
     setUnlimitedStock(false);
+    setPurchasePrice('');
+    setProductGstRate('');
+    setHsnCode('');
   };
 
   const handleUpdateProduct = async () => {
@@ -1167,6 +1194,9 @@ const SellerDashboard: React.FC = () => {
           delivery_charge: parseFloat(deliveryCharge) || 0,
           free_delivery_quantity: parseInt(freeDeliveryQuantity) || 0,
           unlimited_stock: unlimitedStock,
+          purchase_price: purchasePrice === '' ? null : parseFloat(purchasePrice),
+          gst_rate: productGstRate === '' ? null : parseFloat(productGstRate),
+          hsn_code: hsnCode || null,
         } as any)
         .eq('id', editingProduct.id);
 
@@ -2301,6 +2331,9 @@ const SellerDashboard: React.FC = () => {
                                 setDeliveryCharge(String((product as any).delivery_charge ?? 0));
                                 setFreeDeliveryQuantity(String((product as any).free_delivery_quantity ?? 0));
                                 setUnlimitedStock(Boolean((product as any).unlimited_stock));
+                                setPurchasePrice((product as any).purchase_price != null ? String((product as any).purchase_price) : '');
+                                setProductGstRate((product as any).gst_rate != null ? String((product as any).gst_rate) : '');
+                                setHsnCode((product as any).hsn_code || '');
                                 const { data: tiersData } = await supabase
                                   .from('product_wholesale_tiers')
                                   .select('min_quantity, price')
@@ -2555,6 +2588,63 @@ const SellerDashboard: React.FC = () => {
                 </div>
 
                 {/* Unlimited stock toggle */}
+                {/* Costing, margin & GST */}
+                <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <Label className="text-sm font-semibold">Costing, Margin & GST</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-xs">Purchase Price (₹)</Label>
+                      <Input
+                        type="number"
+                        value={purchasePrice}
+                        onChange={(e) => setPurchasePrice(e.target.value)}
+                        placeholder="e.g. 80"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">GST Rate (%)</Label>
+                      <Input
+                        type="number"
+                        value={productGstRate}
+                        onChange={(e) => setProductGstRate(e.target.value)}
+                        placeholder="e.g. 5"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">HSN Code</Label>
+                      <Input
+                        value={hsnCode}
+                        onChange={(e) => setHsnCode(e.target.value)}
+                        placeholder="e.g. 0910"
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
+                  {costing && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="rounded-md bg-card p-2">
+                        <p className="text-muted-foreground">Selling (default)</p>
+                        <p className="font-semibold">₹{costing.selling.toFixed(2)}</p>
+                      </div>
+                      <div className="rounded-md bg-card p-2">
+                        <p className="text-muted-foreground">Profit / unit</p>
+                        <p className={`font-semibold ${costing.profit < 0 ? 'text-destructive' : 'text-green-600'}`}>₹{costing.profit.toFixed(2)}</p>
+                      </div>
+                      <div className="rounded-md bg-card p-2">
+                        <p className="text-muted-foreground">Margin</p>
+                        <p className={`font-semibold ${costing.margin < 0 ? 'text-destructive' : 'text-green-600'}`}>{costing.margin.toFixed(1)}%</p>
+                      </div>
+                      <div className="rounded-md bg-card p-2">
+                        <p className="text-muted-foreground">Taxable + GST</p>
+                        <p className="font-semibold">₹{costing.taxable.toFixed(2)} + ₹{costing.gstAmount.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Profit, margin and the GST split are calculated automatically from the purchase price and the default variant price (prices treated as GST inclusive).
+                  </p>
+                </div>
+
                 <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-between gap-4">
                   <div>
                     <Label className="text-sm font-semibold">♾️ Unlimited Stock</Label>

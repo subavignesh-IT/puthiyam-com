@@ -23,10 +23,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     setSaleExpired(true);
   }, []);
 
-  // Get the lowest price from variants or use base price
-  const displayPrice = product.variants && product.variants.length > 0
-    ? product.variants[0].price
-    : product.price;
+  // Use the seller-selected default variant (falls back to the first one)
+  const defaultVariant = product.variants && product.variants.length > 0
+    ? (product.variants.find(v => v.isDefault) || product.variants[0])
+    : undefined;
+  const displayPrice = defaultVariant ? defaultVariant.price : product.price;
 
   // Calculate discounted price if on sale (and sale hasn't expired locally)
   const isOnSale = product.isOnSale && !saleExpired;
@@ -121,9 +122,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             ) : (
               <span className="text-lg font-bold text-primary">₹{displayPrice}</span>
             )}
-            {product.variants && product.variants.length > 0 && (
+            {defaultVariant && (
               <span className="text-xs text-muted-foreground ml-1">
-                ({product.variants[0].weight})
+                ({defaultVariant.weight})
               </span>
             )}
           </div>

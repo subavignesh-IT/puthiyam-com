@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store, Trash2, Package, ShoppingCart, Users, Edit, UserCheck, Check, X } from 'lucide-react';
 import Header from '@/components/Header';
@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -71,6 +72,16 @@ const AdminDashboard = () => {
   const [topTab, setTopTab] = useState<'orders' | 'requests' | 'sellers' | 'products'>('orders');
   const [tab, setTab] = useState('all');
   const [sellerRequests, setSellerRequests] = useState<any[]>([]);
+  const [requestSearch, setRequestSearch] = useState('');
+  const filteredRequests = useMemo(() => {
+    const q = requestSearch.trim().toLowerCase();
+    if (!q) return sellerRequests;
+    return sellerRequests.filter((r) =>
+      [r.full_name, r.company_name, r.shop_name, r.gstin, r.city, r.pincode, r.business_address, r.phone, r.email]
+        .filter(Boolean)
+        .some((v: string) => String(v).toLowerCase().includes(q))
+    );
+  }, [sellerRequests, requestSearch]);
 
   useEffect(() => {
     if (authLoading || adminLoading) return;
@@ -320,16 +331,27 @@ const AdminDashboard = () => {
                   <UserCheck className="w-5 h-5 text-primary" />
                   Seller Requests ({sellerRequests.length})
                 </CardTitle>
+                <Input
+                  placeholder="Search by name, company, GSTIN, city, phone or email…"
+                  value={requestSearch}
+                  onChange={(e) => setRequestSearch(e.target.value)}
+                  className="mt-3 h-10"
+                />
               </CardHeader>
               <CardContent>
-                {sellerRequests.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground">No seller requests yet</p>
+                {filteredRequests.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">
+                    {sellerRequests.length === 0 ? 'No seller requests yet' : 'No requests match your search'}
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>GSTIN</TableHead>
+                          <TableHead>Location</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Status</TableHead>
@@ -338,9 +360,14 @@ const AdminDashboard = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sellerRequests.map((r) => (
+                        {filteredRequests.map((r) => (
                           <TableRow key={r.id}>
                             <TableCell className="font-medium">{r.full_name}</TableCell>
+                            <TableCell className="text-xs">{r.company_name || r.shop_name || '—'}</TableCell>
+                            <TableCell className="text-xs font-mono">{r.gstin || '—'}</TableCell>
+                            <TableCell className="text-xs max-w-[200px]">
+                              {[r.business_address, r.city, r.pincode].filter(Boolean).join(', ') || '—'}
+                            </TableCell>
                             <TableCell className="text-xs">{r.email}</TableCell>
                             <TableCell className="text-xs">{r.phone || '—'}</TableCell>
                             <TableCell>

@@ -7,6 +7,7 @@ import { useCart } from '@/context/CartContext';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
+import ProductCard from '@/components/ProductCard';
 import ImageSlideshow from '@/components/ImageSlideshow';
 import SaleCountdownTimer from '@/components/SaleCountdownTimer';
 import ShareButton from '@/components/ShareButton';
@@ -54,6 +55,7 @@ const ProductDetail: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [saleExpired, setSaleExpired] = useState(false);
   const [totalStock, setTotalStock] = useState(0);
@@ -69,12 +71,13 @@ const ProductDetail: React.FC = () => {
     if (id) {
       fetchProduct();
       fetchReviews();
+      fetchOtherProducts();
     }
   }, [id]);
 
   useEffect(() => {
     if (product?.variants && product.variants.length > 0 && !selectedVariant) {
-      setSelectedVariant(product.variants[0]);
+      setSelectedVariant(product.variants.find(v => v.isDefault) || product.variants[0]);
     }
   }, [product, selectedVariant]);
 
@@ -130,6 +133,7 @@ const ProductDetail: React.FC = () => {
             weight: `${v.quantity}${dbProduct.measurement_unit}`,
             price: v.price,
             stockQuantity: v.stock_quantity,
+            isDefault: Boolean(v.is_default),
           })),
           isInStock: dbProduct.is_in_stock,
           isOnSale: dbProduct.is_on_sale && !isSaleExpired,
@@ -172,13 +176,57 @@ const ProductDetail: React.FC = () => {
   const fetchReviews = async () => {
     const { data, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select('id, product_id, user_name, rating, comment, image_url, created_at')
       .eq('product_id', id)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setReviews(data);
+      setReviews(data as any);
     }
+  };
+
+  const fetchOtherProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .neq('id', id)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    const list: Product[] = await Promise.all(
+      (data || []).map(async (p: any) => {
+        const [variantsRes, imagesRes] = await Promise.all([
+          supabase.from('product_variants').select('*').eq('product_id', p.id).order('price'),
+          supabase.from('product_images').select('*').eq('product_id', p.id).order('display_order'),
+        ]);
+        const variants = variantsRes.data || [];
+        const images = imagesRes.data || [];
+        const primary = images.find((i: any) => i.is_primary) || images[0];
+        const def = variants.find((v: any) => v.is_default) || variants[0];
+        return {
+          id: p.id,
+          name: p.name,
+          price: def?.price || p.base_price,
+          category: p.category,
+          image: primary?.image_url || '/placeholder.svg',
+          description: p.description || '',
+          rating: 0,
+          reviewCount: 0,
+          variants: variants.map((v: any) => ({
+            weight: `${v.quantity}${p.measurement_unit}`,
+            price: v.price,
+            stockQuantity: v.stock_quantity,
+            isDefault: Boolean(v.is_default),
+          })),
+          isInStock: p.is_in_stock,
+          isOnSale: false,
+          totalStock: variants.reduce((s: number, v: any) => s + (v.stock_quantity || 0), 0),
+          unlimitedStock: Boolean(p.unlimited_stock),
+        } as Product;
+      })
+    );
+    setOtherProducts(list);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -711,6 +759,17 @@ const ProductDetail: React.FC = () => {
             )}
           </div>
         </section>
+
+        {otherProducts.length > 0 && (
+          <section className="mt-12">
+            <h2 className="font-serif text-2xl font-bold mb-4">Other Products</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {otherProducts.map(p => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />
