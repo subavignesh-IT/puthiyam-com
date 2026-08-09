@@ -1040,10 +1040,12 @@ const SellerDashboard: React.FC = () => {
           delivery_charge: parseFloat(deliveryCharge) || 0,
           free_delivery_quantity: parseInt(freeDeliveryQuantity) || 0,
           unlimited_stock: unlimitedStock,
+          purchase_price: purchasePrice === '' ? null : parseFloat(purchasePrice),
+          gst_rate: productGstRate === '' ? null : parseFloat(productGstRate),
+          hsn_code: hsnCode || null,
         } as any)
         .select()
         .single();
-        // fields set above
 
       if (productError) throw productError;
 
@@ -1171,6 +1173,9 @@ const SellerDashboard: React.FC = () => {
           delivery_charge: parseFloat(deliveryCharge) || 0,
           free_delivery_quantity: parseInt(freeDeliveryQuantity) || 0,
           unlimited_stock: unlimitedStock,
+          purchase_price: purchasePrice === '' ? null : parseFloat(purchasePrice),
+          gst_rate: productGstRate === '' ? null : parseFloat(productGstRate),
+          hsn_code: hsnCode || null,
         } as any)
         .eq('id', editingProduct.id);
 
