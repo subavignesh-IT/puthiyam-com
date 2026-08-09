@@ -71,6 +71,7 @@ const AdminDashboard = () => {
   const [topTab, setTopTab] = useState<'orders' | 'requests' | 'sellers' | 'products'>('orders');
   const [tab, setTab] = useState('all');
   const [sellerRequests, setSellerRequests] = useState<any[]>([]);
+  const [requestSearch, setRequestSearch] = useState('');
 
   useEffect(() => {
     if (authLoading || adminLoading) return;
