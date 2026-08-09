@@ -72,6 +72,15 @@ const AdminDashboard = () => {
   const [tab, setTab] = useState('all');
   const [sellerRequests, setSellerRequests] = useState<any[]>([]);
   const [requestSearch, setRequestSearch] = useState('');
+  const filteredRequests = React.useMemo(() => {
+    const q = requestSearch.trim().toLowerCase();
+    if (!q) return sellerRequests;
+    return sellerRequests.filter((r) =>
+      [r.full_name, r.company_name, r.shop_name, r.gstin, r.city, r.pincode, r.business_address, r.phone, r.email]
+        .filter(Boolean)
+        .some((v: string) => String(v).toLowerCase().includes(q))
+    );
+  }, [sellerRequests, requestSearch]);
 
   useEffect(() => {
     if (authLoading || adminLoading) return;
