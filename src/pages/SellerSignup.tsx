@@ -249,6 +249,64 @@ const SellerSignup: React.FC = () => {
                 </div>
               </div>
 
+              <div className="pt-2 border-t space-y-4">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary" /> Company Details
+                  <span className="text-xs font-normal text-muted-foreground">(required for approval)</span>
+                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Shop / Company Name</Label>
+                  <div className="relative">
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="companyName" name="companyName" value={formData.companyName} onChange={handleInputChange} placeholder="e.g. Puthiyam Traders" className="pl-10" required />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gstin">GSTIN (optional)</Label>
+                  <div className="relative">
+                    <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="gstin" name="gstin" value={formData.gstin} onChange={handleInputChange} placeholder="e.g. 33ABCDE1234F1Z5" maxLength={15} className="pl-10 uppercase font-mono" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="businessAddress">Business Address</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="businessAddress" name="businessAddress" value={formData.businessAddress} onChange={handleInputChange} placeholder="Street, area" className="pl-10" required />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City / District</Label>
+                    <Input id="city" name="city" value={formData.city} onChange={handleInputChange} placeholder="e.g. Paramakudi" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pincode">Pincode</Label>
+                    <Input id="pincode" name="pincode" value={formData.pincode} onChange={handleInputChange} placeholder="e.g. 623707" maxLength={6} required />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 hidden">
+                <Label htmlFor="password-legacy">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password-legacy"
+                    name="password-legacy"
+                    type={showPassword ? 'text' : 'password'}
+                    value=""
+                    readOnly
+                    placeholder="e.g. ••••••••"
+                    className="pl-10 pr-10"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <div className="relative">
