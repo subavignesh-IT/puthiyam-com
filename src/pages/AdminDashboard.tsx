@@ -321,16 +321,27 @@ const AdminDashboard = () => {
                   <UserCheck className="w-5 h-5 text-primary" />
                   Seller Requests ({sellerRequests.length})
                 </CardTitle>
+                <Input
+                  placeholder="Search by name, company, GSTIN, city, phone or email…"
+                  value={requestSearch}
+                  onChange={(e) => setRequestSearch(e.target.value)}
+                  className="mt-3 h-10"
+                />
               </CardHeader>
               <CardContent>
-                {sellerRequests.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground">No seller requests yet</p>
+                {filteredRequests.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">
+                    {sellerRequests.length === 0 ? 'No seller requests yet' : 'No requests match your search'}
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>GSTIN</TableHead>
+                          <TableHead>Location</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Status</TableHead>
@@ -339,9 +350,14 @@ const AdminDashboard = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sellerRequests.map((r) => (
+                        {filteredRequests.map((r) => (
                           <TableRow key={r.id}>
                             <TableCell className="font-medium">{r.full_name}</TableCell>
+                            <TableCell className="text-xs">{r.company_name || r.shop_name || '—'}</TableCell>
+                            <TableCell className="text-xs font-mono">{r.gstin || '—'}</TableCell>
+                            <TableCell className="text-xs max-w-[200px]">
+                              {[r.business_address, r.city, r.pincode].filter(Boolean).join(', ') || '—'}
+                            </TableCell>
                             <TableCell className="text-xs">{r.email}</TableCell>
                             <TableCell className="text-xs">{r.phone || '—'}</TableCell>
                             <TableCell>
