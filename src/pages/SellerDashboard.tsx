@@ -194,6 +194,9 @@ const SellerDashboard: React.FC = () => {
   const [freeDeliveryQuantity, setFreeDeliveryQuantity] = useState('0');
   const [wholesaleTiers, setWholesaleTiers] = useState<{ minQuantity: number; price: number }[]>([]);
   const [unlimitedStock, setUnlimitedStock] = useState(false);
+  const [purchasePrice, setPurchasePrice] = useState('');
+  const [productGstRate, setProductGstRate] = useState('');
+  const [hsnCode, setHsnCode] = useState('');
 
   // New category/packing type form
   const [newCategory, setNewCategory] = useState('');
