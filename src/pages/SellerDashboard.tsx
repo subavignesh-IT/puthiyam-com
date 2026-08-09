@@ -1043,8 +1043,7 @@ const SellerDashboard: React.FC = () => {
         } as any)
         .select()
         .single();
-
-      // (purchase price / GST persisted below)
+        // fields set above
 
       if (productError) throw productError;
 
