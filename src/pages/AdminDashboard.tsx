@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store, Trash2, Package, ShoppingCart, Users, Edit, UserCheck, Check, X } from 'lucide-react';
 import Header from '@/components/Header';
@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -72,7 +73,7 @@ const AdminDashboard = () => {
   const [tab, setTab] = useState('all');
   const [sellerRequests, setSellerRequests] = useState<any[]>([]);
   const [requestSearch, setRequestSearch] = useState('');
-  const filteredRequests = React.useMemo(() => {
+  const filteredRequests = useMemo(() => {
     const q = requestSearch.trim().toLowerCase();
     if (!q) return sellerRequests;
     return sellerRequests.filter((r) =>
