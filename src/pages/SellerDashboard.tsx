@@ -1044,6 +1044,8 @@ const SellerDashboard: React.FC = () => {
         .select()
         .single();
 
+      // (purchase price / GST persisted below)
+
       if (productError) throw productError;
 
       // Add variants
