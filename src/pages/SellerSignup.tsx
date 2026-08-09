@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Mail, Lock, Eye, EyeOff, User, Phone, Store } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Phone, Store, Building2, MapPin, Receipt } from 'lucide-react';
 
 const SellerSignup: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +20,11 @@ const SellerSignup: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    companyName: '',
+    gstin: '',
+    businessAddress: '',
+    city: '',
+    pincode: '',
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,6 +41,15 @@ const SellerSignup: React.FC = () => {
       toast({
         title: "Missing Fields",
         description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.companyName || !formData.businessAddress || !formData.city || !formData.pincode) {
+      toast({
+        title: "Company Details Required",
+        description: "Shop/company name, address, city and pincode are required for admin approval",
         variant: "destructive"
       });
       return;
@@ -95,30 +109,36 @@ const SellerSignup: React.FC = () => {
         return;
       }
 
-      // 2. Update profile with name and phone
-      await supabase.from('profiles').update({
-        full_name: formData.fullName,
-        phone: formData.phone,
-      }).eq('user_id', authData.user.id);
-
-      // 3. Create a seller access request (pending admin approval)
-      const { error: reqError } = await supabase
-        .from('seller_requests' as any)
-        .insert({
+      // 2. Create the seller access request server-side (works even before email confirmation)
+      const { data: reqData, error: reqError } = await supabase.functions.invoke('seller-request', {
+        body: {
           user_id: authData.user.id,
           full_name: formData.fullName,
           email: formData.email,
           phone: formData.phone,
-        });
+          shop_name: formData.companyName,
+          company_name: formData.companyName,
+          gstin: formData.gstin,
+          business_address: formData.businessAddress,
+          city: formData.city,
+          pincode: formData.pincode,
+        },
+      });
 
-      if (reqError) {
-        console.error('Error creating seller request:', reqError);
+      if (reqError || (reqData as any)?.error) {
+        setLoading(false);
+        toast({
+          title: "Request Not Submitted",
+          description: (reqData as any)?.error || reqError?.message || 'Could not send your seller request. Please try again.',
+          variant: "destructive",
+        });
+        return;
       }
 
-      // 4. Notify admin via WhatsApp (opens on user's device)
+      // 3. Notify admin via WhatsApp (opens on user's device)
       try {
         const msg = encodeURIComponent(
-          `New seller request on PUTHIYAM PRODUCTS\n\nName: ${formData.fullName}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nApprove in Admin Dashboard.`
+          `New seller request on PUTHIYAM PRODUCTS\n\nName: ${formData.fullName}\nCompany: ${formData.companyName}\nGSTIN: ${formData.gstin || '-'}\nEmail: ${formData.email}\nPhone: ${formData.phone}\nAddress: ${formData.businessAddress}, ${formData.city} - ${formData.pincode}\n\nApprove in Admin Dashboard.`
         );
         window.open(`https://wa.me/919361284773?text=${msg}`, '_blank');
       } catch {}
