@@ -291,22 +291,6 @@ const SellerSignup: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-2 hidden">
-                <Label htmlFor="password-legacy">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="password-legacy"
-                    name="password-legacy"
-                    type={showPassword ? 'text' : 'password'}
-                    value=""
-                    readOnly
-                    placeholder="e.g. ••••••••"
-                    className="pl-10 pr-10"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <div className="relative">
