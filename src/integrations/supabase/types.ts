@@ -88,6 +88,99 @@ export type Database = {
           },
         ]
       }
+      bill_designs: {
+        Row: {
+          accent_color: string
+          business_address: string | null
+          business_name: string | null
+          business_phone: string | null
+          created_at: string
+          font_family: string
+          font_size: number
+          footer_note: string | null
+          header_color: string
+          id: string
+          is_default: boolean
+          logo_url: string | null
+          name: string
+          seller_id: string
+          show_batch: boolean
+          show_delivery: boolean
+          show_gstin: boolean
+          show_hsn: boolean
+          show_loyalty: boolean
+          show_mfd_exp: boolean
+          show_signature: boolean
+          show_upi_qr: boolean
+          table_header_color: string
+          template: string
+          terms: string | null
+          totals_color: string
+          updated_at: string
+          upi_id: string | null
+        }
+        Insert: {
+          accent_color?: string
+          business_address?: string | null
+          business_name?: string | null
+          business_phone?: string | null
+          created_at?: string
+          font_family?: string
+          font_size?: number
+          footer_note?: string | null
+          header_color?: string
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          seller_id: string
+          show_batch?: boolean
+          show_delivery?: boolean
+          show_gstin?: boolean
+          show_hsn?: boolean
+          show_loyalty?: boolean
+          show_mfd_exp?: boolean
+          show_signature?: boolean
+          show_upi_qr?: boolean
+          table_header_color?: string
+          template?: string
+          terms?: string | null
+          totals_color?: string
+          updated_at?: string
+          upi_id?: string | null
+        }
+        Update: {
+          accent_color?: string
+          business_address?: string | null
+          business_name?: string | null
+          business_phone?: string | null
+          created_at?: string
+          font_family?: string
+          font_size?: number
+          footer_note?: string | null
+          header_color?: string
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          seller_id?: string
+          show_batch?: boolean
+          show_delivery?: boolean
+          show_gstin?: boolean
+          show_hsn?: boolean
+          show_loyalty?: boolean
+          show_mfd_exp?: boolean
+          show_signature?: boolean
+          show_upi_qr?: boolean
+          table_header_color?: string
+          template?: string
+          terms?: string | null
+          totals_color?: string
+          updated_at?: string
+          upi_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -368,6 +461,69 @@ export type Database = {
           },
         ]
       }
+      product_batches: {
+        Row: {
+          barcode: string | null
+          batch_no: string
+          created_at: string
+          exp_date: string | null
+          id: string
+          mfd_date: string | null
+          notes: string | null
+          product_id: string
+          purchase_price: number | null
+          quantity: number
+          seller_id: string
+          updated_at: string
+          variant_id: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          batch_no: string
+          created_at?: string
+          exp_date?: string | null
+          id?: string
+          mfd_date?: string | null
+          notes?: string | null
+          product_id: string
+          purchase_price?: number | null
+          quantity?: number
+          seller_id: string
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          batch_no?: string
+          created_at?: string
+          exp_date?: string | null
+          id?: string
+          mfd_date?: string | null
+          notes?: string | null
+          product_id?: string
+          purchase_price?: number | null
+          quantity?: number
+          seller_id?: string
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           created_at: string
@@ -560,12 +716,17 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          business_address: string | null
+          city: string | null
+          company_name: string | null
           created_at: string
           full_name: string | null
+          gstin: string | null
           id: string
           is_blocked: boolean
           loyalty_enabled: boolean
           phone: string | null
+          pincode: string | null
           theme: string | null
           updated_at: string
           upi_id: string | null
@@ -573,12 +734,17 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          business_address?: string | null
+          city?: string | null
+          company_name?: string | null
           created_at?: string
           full_name?: string | null
+          gstin?: string | null
           id?: string
           is_blocked?: boolean
           loyalty_enabled?: boolean
           phone?: string | null
+          pincode?: string | null
           theme?: string | null
           updated_at?: string
           upi_id?: string | null
@@ -586,12 +752,17 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          business_address?: string | null
+          city?: string | null
+          company_name?: string | null
           created_at?: string
           full_name?: string | null
+          gstin?: string | null
           id?: string
           is_blocked?: boolean
           loyalty_enabled?: boolean
           phone?: string | null
+          pincode?: string | null
           theme?: string | null
           updated_at?: string
           upi_id?: string | null
@@ -718,11 +889,16 @@ export type Database = {
       seller_requests: {
         Row: {
           admin_note: string | null
+          business_address: string | null
+          city: string | null
+          company_name: string | null
           created_at: string
           email: string
           full_name: string
+          gstin: string | null
           id: string
           phone: string | null
+          pincode: string | null
           shop_name: string | null
           status: string
           updated_at: string
@@ -730,11 +906,16 @@ export type Database = {
         }
         Insert: {
           admin_note?: string | null
+          business_address?: string | null
+          city?: string | null
+          company_name?: string | null
           created_at?: string
           email: string
           full_name: string
+          gstin?: string | null
           id?: string
           phone?: string | null
+          pincode?: string | null
           shop_name?: string | null
           status?: string
           updated_at?: string
@@ -742,11 +923,16 @@ export type Database = {
         }
         Update: {
           admin_note?: string | null
+          business_address?: string | null
+          city?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string
           full_name?: string
+          gstin?: string | null
           id?: string
           phone?: string | null
+          pincode?: string | null
           shop_name?: string | null
           status?: string
           updated_at?: string
@@ -885,6 +1071,10 @@ export type Database = {
       }
     }
     Functions: {
+      consume_variant_batches: {
+        Args: { _qty: number; _variant_id: string }
+        Returns: Json
+      }
       decrement_variant_stock:
         | { Args: { _qty: number; _variant_id: string }; Returns: undefined }
         | {
