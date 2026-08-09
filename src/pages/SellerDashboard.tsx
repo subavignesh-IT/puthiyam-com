@@ -198,6 +198,24 @@ const SellerDashboard: React.FC = () => {
   const [productGstRate, setProductGstRate] = useState('');
   const [hsnCode, setHsnCode] = useState('');
 
+  // Auto-calculated profit, margin and GST split for the product form
+  const costing = useMemo(() => {
+    const cost = parseFloat(purchasePrice);
+    if (!isFinite(cost) || cost <= 0) return null;
+    const def = variants.find(v => v.isDefault) || variants[0];
+    const selling = Number(def?.price) || 0;
+    if (!selling) return null;
+    const rate = parseFloat(productGstRate) || 0;
+    const taxable = rate > 0 ? selling / (1 + rate / 100) : selling;
+    return {
+      selling,
+      profit: selling - cost,
+      margin: (selling - cost) / selling * 100,
+      taxable,
+      gstAmount: selling - taxable,
+    };
+  }, [purchasePrice, productGstRate, variants]);
+
   // New category/packing type form
   const [newCategory, setNewCategory] = useState('');
   const [newPackingType, setNewPackingType] = useState('');
