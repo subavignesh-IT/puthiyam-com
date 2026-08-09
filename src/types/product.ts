@@ -2,6 +2,7 @@ export interface ProductVariant {
   weight: string;
   price: number;
   stockQuantity?: number;
+  isDefault?: boolean;
 }
 
 export interface WholesaleTier {
