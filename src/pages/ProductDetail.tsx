@@ -74,7 +74,7 @@ const ProductDetail: React.FC = () => {
 
   useEffect(() => {
     if (product?.variants && product.variants.length > 0 && !selectedVariant) {
-      setSelectedVariant(product.variants[0]);
+      setSelectedVariant(product.variants.find(v => v.isDefault) || product.variants[0]);
     }
   }, [product, selectedVariant]);
 
@@ -130,6 +130,7 @@ const ProductDetail: React.FC = () => {
             weight: `${v.quantity}${dbProduct.measurement_unit}`,
             price: v.price,
             stockQuantity: v.stock_quantity,
+            isDefault: Boolean(v.is_default),
           })),
           isInStock: dbProduct.is_in_stock,
           isOnSale: dbProduct.is_on_sale && !isSaleExpired,
@@ -172,12 +173,12 @@ const ProductDetail: React.FC = () => {
   const fetchReviews = async () => {
     const { data, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select('id, product_id, user_name, rating, comment, image_url, created_at')
       .eq('product_id', id)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setReviews(data);
+      setReviews(data as any);
     }
   };
 
