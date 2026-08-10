@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { Download, FileText, Printer, Receipt, Bluetooth, Share2 } from 'lucide-react';
+import { Download, FileText, Printer, Receipt, Bluetooth, Share2, PackageCheck } from 'lucide-react';
 import { downloadA4Pdf, printImageA4, sharePdf } from '@/lib/pdf';
+import { CourierLabelData, downloadCourierLabel } from '@/lib/courierLabel';
 import {
   ThermalReceipt,
   bluetoothPrintingSupported,
@@ -17,9 +18,11 @@ interface Props {
   receipt?: ThermalReceipt | null;
   shareText?: string;
   compact?: boolean;
+  /** When provided, shows a quarter-A4 courier sticker download button. */
+  courier?: CourierLabelData | null;
 }
 
-const InvoiceActions: React.FC<Props> = ({ getJpeg, filename, receipt, shareText, compact }) => {
+const InvoiceActions: React.FC<Props> = ({ getJpeg, filename, receipt, shareText, compact, courier }) => {
   const [busy, setBusy] = useState<string | null>(null);
 
   const run = async (key: string, fn: () => Promise<void> | void) => {
@@ -64,6 +67,12 @@ const InvoiceActions: React.FC<Props> = ({ getJpeg, filename, receipt, shareText
     toast({ title: 'Sent to Bluetooth printer' });
   });
 
+  const courierLabel = () => run('courier', async () => {
+    if (!courier) return;
+    await downloadCourierLabel(courier);
+    toast({ title: 'Courier label downloaded', description: 'Quarter-A4 sticker ready to print' });
+  });
+
   const size = compact ? 'sm' : 'default';
 
   return (
@@ -80,6 +89,11 @@ const InvoiceActions: React.FC<Props> = ({ getJpeg, filename, receipt, shareText
       <Button variant="outline" size={size} onClick={printA4} disabled={!!busy}>
         <Printer className="w-4 h-4 mr-1" /> Print A4
       </Button>
+      {courier && (
+        <Button variant="outline" size={size} onClick={courierLabel} disabled={!!busy}>
+          <PackageCheck className="w-4 h-4 mr-1" /> {busy === 'courier' ? 'Building…' : 'Courier label'}
+        </Button>
+      )}
       {receipt && (
         <Button variant="outline" size={size} onClick={thermal} disabled={!!busy}>
           <Receipt className="w-4 h-4 mr-1" /> Thermal
