@@ -1,6 +1,17 @@
 import jsPDF from 'jspdf';
+import { toJpeg } from 'html-to-image';
 
 const A4 = { w: 210, h: 297 };
+
+/**
+ * Renders a bill DOM node to a JPEG at 1080p-class quality — the pixel ratio is
+ * derived so the exported image is at least 1080px wide.
+ */
+export const renderHdJpeg = async (node: HTMLElement, minWidth = 1080): Promise<string> => {
+  const width = node.offsetWidth || node.clientWidth || 720;
+  const ratio = Math.max(2, Math.ceil((minWidth / width) * 10) / 10);
+  return toJpeg(node, { quality: 0.95, backgroundColor: '#ffffff', pixelRatio: ratio });
+};
 
 const imageSize = (dataUrl: string) =>
   new Promise<{ w: number; h: number }>((resolve) => {
