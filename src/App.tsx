@@ -23,6 +23,7 @@ import NotFound from "./pages/NotFound";
 import SellerSignup from "./pages/SellerSignup";
 import POS from "./pages/POS";
 import RateOrder from "./pages/RateOrder";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <HashRouter>
+            <ScrollToTop />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/about" element={<About />} />
