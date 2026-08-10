@@ -284,6 +284,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          amount_received: number
           courier_name: string | null
           courier_notes: string | null
           courier_tracking: string | null
@@ -311,6 +312,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          amount_received?: number
           courier_name?: string | null
           courier_notes?: string | null
           courier_tracking?: string | null
@@ -338,6 +340,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          amount_received?: number
           courier_name?: string | null
           courier_notes?: string | null
           courier_tracking?: string | null
@@ -464,6 +467,7 @@ export type Database = {
       product_batches: {
         Row: {
           barcode: string | null
+          barcode_status: string
           batch_no: string
           created_at: string
           exp_date: string | null
@@ -479,6 +483,7 @@ export type Database = {
         }
         Insert: {
           barcode?: string | null
+          barcode_status?: string
           batch_no: string
           created_at?: string
           exp_date?: string | null
@@ -494,6 +499,7 @@ export type Database = {
         }
         Update: {
           barcode?: string | null
+          barcode_status?: string
           batch_no?: string
           created_at?: string
           exp_date?: string | null
@@ -555,6 +561,76 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_purchases: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          id: string
+          invoice_no: string | null
+          notes: string | null
+          product_id: string
+          purchase_date: string
+          purchase_price: number
+          quantity: number
+          seller_id: string
+          supplier: string | null
+          updated_at: string
+          variant_id: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_no?: string | null
+          notes?: string | null
+          product_id: string
+          purchase_date?: string
+          purchase_price?: number
+          quantity?: number
+          seller_id: string
+          supplier?: string | null
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_no?: string | null
+          notes?: string | null
+          product_id?: string
+          purchase_date?: string
+          purchase_price?: number
+          quantity?: number
+          seller_id?: string
+          supplier?: string | null
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_purchases_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_purchases_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_purchases_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -715,7 +791,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          aadhaar_number: string | null
           address: string | null
+          bank_account_number: string | null
+          bank_ifsc: string | null
           business_address: string | null
           city: string | null
           company_name: string | null
@@ -725,6 +804,7 @@ export type Database = {
           id: string
           is_blocked: boolean
           loyalty_enabled: boolean
+          pan_number: string | null
           phone: string | null
           pincode: string | null
           theme: string | null
@@ -733,7 +813,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          aadhaar_number?: string | null
           address?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
           business_address?: string | null
           city?: string | null
           company_name?: string | null
@@ -743,6 +826,7 @@ export type Database = {
           id?: string
           is_blocked?: boolean
           loyalty_enabled?: boolean
+          pan_number?: string | null
           phone?: string | null
           pincode?: string | null
           theme?: string | null
@@ -751,7 +835,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          aadhaar_number?: string | null
           address?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
           business_address?: string | null
           city?: string | null
           company_name?: string | null
@@ -761,6 +848,7 @@ export type Database = {
           id?: string
           is_blocked?: boolean
           loyalty_enabled?: boolean
+          pan_number?: string | null
           phone?: string | null
           pincode?: string | null
           theme?: string | null
@@ -888,7 +976,10 @@ export type Database = {
       }
       seller_requests: {
         Row: {
+          aadhaar_number: string | null
           admin_note: string | null
+          bank_account_number: string | null
+          bank_ifsc: string | null
           business_address: string | null
           city: string | null
           company_name: string | null
@@ -897,15 +988,20 @@ export type Database = {
           full_name: string
           gstin: string | null
           id: string
+          pan_number: string | null
           phone: string | null
           pincode: string | null
           shop_name: string | null
           status: string
           updated_at: string
+          upi_id: string | null
           user_id: string
         }
         Insert: {
+          aadhaar_number?: string | null
           admin_note?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
           business_address?: string | null
           city?: string | null
           company_name?: string | null
@@ -914,15 +1010,20 @@ export type Database = {
           full_name: string
           gstin?: string | null
           id?: string
+          pan_number?: string | null
           phone?: string | null
           pincode?: string | null
           shop_name?: string | null
           status?: string
           updated_at?: string
+          upi_id?: string | null
           user_id: string
         }
         Update: {
+          aadhaar_number?: string | null
           admin_note?: string | null
+          bank_account_number?: string | null
+          bank_ifsc?: string | null
           business_address?: string | null
           city?: string | null
           company_name?: string | null
@@ -931,11 +1032,13 @@ export type Database = {
           full_name?: string
           gstin?: string | null
           id?: string
+          pan_number?: string | null
           phone?: string | null
           pincode?: string | null
           shop_name?: string | null
           status?: string
           updated_at?: string
+          upi_id?: string | null
           user_id?: string
         }
         Relationships: []
